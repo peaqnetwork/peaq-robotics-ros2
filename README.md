@@ -486,7 +486,7 @@ We welcome contributions! Please:
 
 - **Documentation**: See [E2E_TEST.md](./E2E_TEST.md) for detailed testing guide
 - **Issues**: Report bugs at [GitHub Issues](https://github.com/peaqnetwork/peaq-robotics-ros2/issues)
-- **Community**: Join our [Discord](https://discord.gg/peaq)
+- **Community**: Join our [Discord](https://discord.gg/peaqnetwork)
 
 ## License
 
