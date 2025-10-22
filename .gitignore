@@ -1,0 +1,47 @@
+# ROS2 build artifacts
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Wallet and sensitive files
+*.json
+!package.json
+!**/package.json
+peaq_wallet.json
+*_wallet.json
+
+# Logs and temporary files
+*.log
+/tmp/
+*.tmp
+
+# AI tool files
+.agents.md
+agents.md
+.cursor/
+.aider*
+.claude*
+
+# Failure tracking (optional - remove if you want to track)
+*_failures.jsonl

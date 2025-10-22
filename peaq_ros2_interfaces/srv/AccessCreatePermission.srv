@@ -1,0 +1,8 @@
+# Create a new permission in the access control system
+# Request contains permission name and description
+# Response contains the transaction hash
+
+string permission
+string description
+---
+string tx_hash

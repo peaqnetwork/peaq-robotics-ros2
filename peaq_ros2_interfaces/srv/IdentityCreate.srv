@@ -1,0 +1,8 @@
+# Create a new DID identity on-chain
+# Name is auto-derived from wallet address: did:peaq:<address>
+# Request contains optional metadata for the identity
+# Response contains the transaction hash
+
+string metadata_json
+---
+string tx_hash

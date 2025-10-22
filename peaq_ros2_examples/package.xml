@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>peaq_ros2_examples</name>
+  <version>1.0.0</version>
+  <description>Example launch files and demo scripts for peaq ROS 2 SDK</description>
+  <maintainer email="robotics@peaq.network">peaq robotics</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>rclcpp</exec_depend>
+
+  <!-- peaq ROS 2 packages -->
+  <exec_depend>peaq_ros2_interfaces</exec_depend>
+  <exec_depend>peaq_ros2_core</exec_depend>
+  <exec_depend>peaq_ros2_humanoids</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

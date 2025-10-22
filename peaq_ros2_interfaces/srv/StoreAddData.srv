@@ -1,0 +1,9 @@
+# Add data to blockchain storage
+# Request contains key, value as JSON, and confirmation mode
+# Response contains the result of the operation
+
+string key
+string value_json
+string mode  # FAST or FINAL
+---
+string result

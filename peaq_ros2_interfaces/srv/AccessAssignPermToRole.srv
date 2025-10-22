@@ -1,0 +1,8 @@
+# Assign a permission to a role
+# Request contains permission and role names
+# Response contains the transaction hash
+
+string permission
+string role
+---
+string tx_hash

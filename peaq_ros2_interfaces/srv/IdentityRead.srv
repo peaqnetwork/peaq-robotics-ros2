@@ -1,0 +1,6 @@
+# Read DID document from chain
+# Empty request (uses configured identity)
+# Response contains the DID document as JSON
+
+---
+string doc_json

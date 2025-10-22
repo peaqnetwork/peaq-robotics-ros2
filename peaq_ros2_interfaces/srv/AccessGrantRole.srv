@@ -1,0 +1,8 @@
+# Grant a role to a user
+# Request contains role name and user identifier
+# Response contains the transaction hash
+
+string role
+string user
+---
+string tx_hash

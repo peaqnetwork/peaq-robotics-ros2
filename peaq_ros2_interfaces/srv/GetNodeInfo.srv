@@ -1,0 +1,5 @@
+# Get information about the core node and its blockchain connection
+# Request: empty (no parameters needed)
+---
+# Response: JSON string with node information
+string result

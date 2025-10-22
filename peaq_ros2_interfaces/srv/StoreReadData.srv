@@ -1,0 +1,7 @@
+# Read data from blockchain storage
+# Request contains key to read
+# Response contains the value as JSON
+
+string key
+---
+string value_json
