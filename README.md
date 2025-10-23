@@ -76,6 +76,150 @@ source install/setup.bash
 ros2 run peaq_ros2_core core_node
 ```
 
+### Standalone (Non-Docker) Setup
+
+Use this if you want to run on your host machine or directly on a robot/humanoid without Docker.
+
+1) Install prerequisites
+
+```bash
+# Ubuntu 22.04 recommended (Linux host)
+sudo apt update && sudo apt install -y \
+  python3-pip git curl wget nano vim \
+  python3-colcon-common-extensions build-essential
+
+# Optional dev helpers
+sudo apt install -y ros-humble-ros-dev-tools || true
+
+# Install ROS 2 Humble (desktop) and source it
+# Follow official guide: https://docs.ros.org/en/humble/Installation.html
+# Tip: add this to ~/.bashrc after install
+echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc
+source ~/.bashrc
+```
+
+2) Install IPFS (Kubo) and initialize
+
+```bash
+# Download and install Kubo (IPFS)
+KUBO_VER=v0.38.1
+wget https://dist.ipfs.tech/kubo/${KUBO_VER}/kubo_${KUBO_VER}_linux-amd64.tar.gz
+tar -xvzf kubo_${KUBO_VER}_linux-amd64.tar.gz
+cd kubo && sudo bash install.sh && cd ..
+rm -rf kubo kubo_${KUBO_VER}_linux-amd64.tar.gz
+
+# Initialize IPFS repo
+ipfs init
+
+# Start IPFS daemon (new terminal recommended)
+ipfs daemon
+
+# Optional: run IPFS via systemd (Ubuntu)
+sudo bash -c 'cat >/etc/systemd/system/ipfs.service <<EOF
+[Unit]
+Description=IPFS daemon
+After=network-online.target
+
+[Service]
+User='"$USER"'
+ExecStart=/usr/local/bin/ipfs daemon
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF'
+sudo systemctl daemon-reload && sudo systemctl enable --now ipfs
+```
+
+3) Python dependencies
+
+```bash
+pip3 install --upgrade pip
+pip3 install -r requirements.txt
+ 
+# Resolve any missing system deps
+sudo rosdep init 2>/dev/null || true
+rosdep update
+rosdep install --from-paths . --ignore-src -r -y || true
+```
+
+4) Build and source workspace
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon build
+source install/setup.bash
+```
+
+5) Configure credentials and run
+
+```bash
+# Create your config from the example and set Pinata JWT/gateway
+cp peaq_ros2_examples/config/peaq_robot.example.yaml \
+   peaq_ros2_examples/config/peaq_robot.yaml
+
+# Edit peaq_ros2_examples/config/peaq_robot.yaml
+# - storage_bridge.storage.pinata.jwt = YOUR_PINATA_JWT
+# - storage_bridge.storage.pinata.gateway_url = your Pinata gateway URL
+
+# Start core node
+ros2 run peaq_ros2_core core_node --ros-args \
+  -p config.yaml_path:=/work/peaq_ros2_examples/config/peaq_robot.yaml &
+
+# Configure and activate
+ros2 lifecycle set /peaq_core_node configure
+ros2 lifecycle set /peaq_core_node activate
+
+# Start storage bridge
+ros2 run peaq_ros2_core storage_bridge_node --ros-args \
+  -p config.yaml_path:=/work/peaq_ros2_examples/config/peaq_robot.yaml &
+```
+
+Notes:
+- If running on a robot, ensure network/firewall allows IPFS API (default 5001) and gateway (8080) locally or adjust config accordingly.
+- Pinata credentials must never be committed; they belong only in your local `peaq_robot.yaml`.
+- macOS: ROS 2 Humble support is limited; prefer Docker. If running natively, use a Linux VM or WSL (on Windows) for best results.
+
+Manual equivalent of Dockerfile steps:
+- Install apt packages: python3-pip, git, curl, wget, editors
+- Install Kubo (IPFS), `ipfs init`, and run `ipfs daemon`
+- `pip3 install -r requirements.txt`
+- Ensure ROS 2 Humble is installed and sourced
+
+### Running on Humanoids/Robots (Host OS)
+
+For humanoids (e.g., Unitree G1) or robots without Docker:
+
+1) Follow the Standalone Setup steps above (install ROS 2, IPFS, Python deps).
+
+2) Configure humanoid adapter
+
+```yaml
+# In peaq_ros2_examples/config/peaq_robot.yaml
+humanoids:
+  adapter: unitree_g1  # or your custom adapter
+  adapter_config:
+    max_linear_velocity: 1.0
+    max_angular_velocity: 2.0
+    motion_timeout: 5.0
+```
+
+3) Launch humanoid bridge
+
+```bash
+ros2 run peaq_ros2_humanoids humanoid_bridge_node --ros-args \
+  -p config.yaml_path:=/work/peaq_ros2_examples/config/peaq_robot.yaml
+```
+
+4) Safety
+- Verify emergency stop wiring/command path before real motion.
+- Start with low velocities and short timeouts; validate in a safe area.
+
+Troubleshooting on devices:
+- Ensure real-time clock and time sync are correct.
+- Validate ROS 2 network discovery across interfaces (set `ROS_DOMAIN_ID` consistently).
+- IPFS must be running locally or `storage_bridge.storage.local_ipfs.api_url` should point to a reachable node.
+
 ## Documentation
 
 - **[E2E_TEST.md](./E2E_TEST.md)** - Complete end-to-end testing guide with step-by-step instructions
