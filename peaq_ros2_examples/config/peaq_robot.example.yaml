@@ -1,0 +1,216 @@
+# =============================================================================
+# PEAQ ROBOT UNIFIED CONFIGURATION (Example)
+# =============================================================================
+# Copy this file to the same directory as `peaq_robot.yaml` and fill in the
+# placeholders (e.g., Pinata JWT, gateway URL) before running.
+#
+# cp peaq_ros2_examples/config/peaq_robot.example.yaml \
+#    peaq_ros2_examples/config/peaq_robot.yaml
+# =============================================================================
+
+# =============================================================================
+# SHARED CONFIGURATION (used by all nodes)
+# =============================================================================
+
+# Network configuration
+# Options: agung (testnet), peaq (mainnet), or custom WSS URL
+network: agung
+
+# Wallet configuration (shared by all nodes)
+wallet:
+  # Path to wallet JSON file (uses Sr25519 - Substrate/Polkadot standard)
+  path: /work/peaq_wallet.json
+  
+  # Auto-generate wallet if it doesn't exist (SAFE - never overwrites)
+  # If true and wallet file doesn't exist: generates new wallet and saves to path
+  # If true and wallet file exists: uses existing wallet (logs warning)
+  # To regenerate: delete the wallet file first, then restart node
+  auto_generate: true
+  
+  # Environment variable containing keystore password (optional)
+  # password_env: PEAQ_ROBOT_KEY_PASSWORD
+  
+  # Option 3: Provide mnemonic directly (NOT recommended for production)
+  # mnemonic: "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12"
+  
+  # Option 4: Provide private key directly (NOT recommended for production)
+  # private_key_hex: "0x1234567890abcdef..."
+
+# Logging configuration (shared by all nodes)
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+  
+  # Log format: human (readable), json (structured)
+  format: human
+
+# =============================================================================
+# CORE NODE CONFIGURATION
+# =============================================================================
+
+core_node:
+  # Transaction confirmation mode
+  # FAST: Quick confirmation, lower security (recommended for testing)
+  # FINAL: Full confirmation, higher security (recommended for production)
+  confirmation_mode: FAST
+  
+  # Event streaming configuration
+  events:
+    # Enable blockchain event streaming
+    enabled: true
+  
+  # Node name (for ROS2)
+  name: peaq_core_node
+
+# =============================================================================
+# EVENTS NODE CONFIGURATION
+# =============================================================================
+
+events_node:
+  # Node name (for ROS2)
+  name: peaq_events_node
+
+# =============================================================================
+# STORAGE BRIDGE CONFIGURATION
+# =============================================================================
+
+storage_bridge:
+  # Robot identity
+  robot:
+    # DID is auto-derived from wallet address: did:peaq:<wallet_address>
+    # No manual configuration needed!
+    
+    # Require DID verification on blockchain (default: true)
+    # If true: verifies DID on chain, ERROR if not found or core_node unavailable
+    # If false: skips verification, WARNING only (for development)
+    require_did: false
+  
+  # Core node connection
+  core:
+    # Name of core node to connect to (must match core_node.name)
+    node_name: peaq_core_node
+  
+  # Storage backend configuration
+  storage:
+    # Storage mode: local_ipfs, pinata, or both
+    mode: pinata
+    
+    # Local IPFS configuration
+    local_ipfs:
+      # IPFS API endpoint
+      api_url: http://127.0.0.1:5001
+      
+      # IPFS gateway URL for retrieving content
+      gateway_url: http://127.0.0.1:8080/ipfs
+      
+      # Local directory to cache IPFS content
+      save_dir: ~/.peaq_ipfs_cache
+    
+    # Pinata configuration (cloud IPFS pinning service)
+    pinata:
+      # Pinata JWT token (recommended - get from https://pinata.cloud)
+      # Replace with your own JWT. Never commit real secrets to git.
+      jwt: "YOUR_PINATA_JWT"
+      
+      # Alternative: API key/secret (if not using JWT)
+      # api_key: "your_pinata_api_key"
+      # api_secret: "your_pinata_api_secret"
+      
+      # Pinata gateway URL for retrieving content
+      gateway_url: https://your-gateway.mypinata.cloud/ipfs
+      
+      # Enable pinning (keep content permanently on Pinata)
+      pin: true
+      
+      # Pinning mode: upload (direct upload) or pin_by_cid (pin existing CID)
+      mode: upload
+
+  # Signature configuration
+  signature:
+    # Signature algorithm: sr25519 (Substrate standard, recommended) or ed25519 (legacy)
+    algorithm: sr25519
+    
+    # Optional: Provide private key directly (NOT recommended for production)
+    # Uses wallet configuration by default
+    # private_key_hex: "0x..."
+
+# =============================================================================
+# HUMANOID BRIDGE CONFIGURATION
+# =============================================================================
+
+humanoids:
+  # Humanoid adapter type
+  # Options: unitree_g1, custom
+  adapter: unitree_g1
+  
+  # Adapter-specific configuration
+  adapter_config:
+    # Maximum velocities (safety limits)
+    max_linear_velocity: 1.0    # m/s
+    max_angular_velocity: 2.0   # rad/s
+    
+    # Motion timeout (automatic stop after this duration)
+    motion_timeout: 5.0  # seconds
+
+# =============================================================================
+# ADVANCED CONFIGURATION (rarely needed)
+# =============================================================================
+
+# Advanced: Override default node names
+# node_names:
+#   core: peaq_core_node
+#   events: peaq_events_node
+#   storage_bridge: peaq_storage_bridge_node
+#   humanoid_bridge: peaq_humanoid_bridge_node
+
+# Advanced: Custom network endpoints
+# network_endpoints:
+#   agung: wss://peaq-agung.api.onfinality.io/ws
+#   peaq: wss://wss.mainnet.peaq.network
+
+# =============================================================================
+# EXAMPLE CONFIGURATIONS
+# =============================================================================
+
+# Example 1: Development setup with auto-generated wallet
+# wallet:
+#   path: ~/.peaq_robot/dev_wallet.json
+#   auto_generate: true
+
+# Example 2: Production setup with existing wallet
+# wallet:
+#   path: /secure/path/to/production_wallet.json
+#   auto_generate: false
+
+# Example 3: Development without DID verification
+# storage_bridge:
+#   robot:
+#     require_did: false
+
+# Example 4: Local IPFS only (no Pinata)
+# storage_bridge:
+#   storage:
+#     mode: local_ipfs
+
+# Example 5: Both local IPFS and Pinata
+# storage_bridge:
+#   storage:
+#     mode: both
+
+# Example 6: Custom humanoid adapter
+# humanoids:
+#   adapter: custom
+#   adapter_config:
+#     custom_param_1: value1
+#     custom_param_2: value2
+
+# Example 7: Production with FINAL confirmation
+# core_node:
+#   confirmation_mode: FINAL
+
+# Example 8: Debug logging
+# logging:
+#   level: DEBUG
+#   format: json
+
+

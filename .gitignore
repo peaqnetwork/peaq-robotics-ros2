@@ -31,6 +31,11 @@ Thumbs.db
 peaq_wallet.json
 *_wallet.json
 
+# Local configs (keep untracked)
+peaq_ros2_examples/config/peaq_robot.yaml
+peaq_ros2_examples/config/bridge.yaml
+peaq_ros2_examples/config/e2e_test_bridge.yaml
+
 # Logs and temporary files
 *.log
 /tmp/

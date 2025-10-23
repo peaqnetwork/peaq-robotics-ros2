@@ -166,6 +166,19 @@ All configuration is in a single file: `peaq_ros2_examples/config/peaq_robot.yam
 
 ### Basic Configuration
 
+1) Copy example config and fill in secrets:
+
+```bash
+cp peaq_ros2_examples/config/peaq_robot.example.yaml \
+   peaq_ros2_examples/config/peaq_robot.yaml
+
+# Edit peaq_ros2_examples/config/peaq_robot.yaml and set:
+# - storage_bridge.storage.pinata.jwt = YOUR_PINATA_JWT
+# - storage_bridge.storage.pinata.gateway_url = your Pinata gateway URL
+```
+
+2) Minimal config structure:
+
 ```yaml
 # Network
 network: agung  # testnet (or 'peaq' for mainnet)
@@ -182,7 +195,7 @@ storage_bridge:
   storage:
     mode: pinata  # or 'local_ipfs' or 'both'
     pinata:
-      jwt: "your_pinata_jwt_token"
+      jwt: "YOUR_PINATA_JWT"
       gateway_url: "https://your-gateway.mypinata.cloud/ipfs"
 ```
 
@@ -191,7 +204,7 @@ storage_bridge:
 1. Sign up at [pinata.cloud](https://pinata.cloud)
 2. Create API key with pinning permissions
 3. Get your gateway URL from dashboard
-4. Add to `peaq_robot.yaml`
+4. Add to `peaq_ros2_examples/config/peaq_robot.yaml`
 
 ## Service Reference
 
@@ -501,4 +514,210 @@ Apache 2.0 - See [LICENSE](LICENSE) file for details
 ---
 
 **Ready to get started?** Follow the [E2E_TEST.md](./E2E_TEST.md) guide for a complete walkthrough.
+
+
+## Robot Profiles
+
+### Plug-and-Play Integration
+
+The SDK includes standardized robot profiles for popular platforms, enabling quick integration without learning each robot's specific API.
+
+### Available Profiles
+
+**Industrial Arms:**
+- Universal Robots UR5
+- KUKA LBR iiwa
+- Franka Emika Panda
+
+**Mobile Robots:**
+- Boston Dynamics Spot
+
+**Custom Robots:**
+- Template for creating your own profiles
+
+### Using a Profile
+
+```yaml
+# In peaq_robot.yaml
+robot:
+  profile: "profiles/industrial_arms/universal_robots_ur5.yaml"
+```
+
+Or programmatically:
+
+```python
+from peaq_ros2_core.profile_loader import load_profile
+
+# Load profile
+profile = load_profile("universal_robots_ur5")
+
+# Access standardized topics
+joint_states_topic = profile.topics['joint_states']
+joint_trajectory_topic = profile.topics['joint_trajectory']
+
+# Get safety limits
+joint_limits = profile.safety['joint_limits']
+for limit in joint_limits:
+    print(f"{limit['name']}: max velocity = {limit['max_velocity']} rad/s")
+```
+
+### Creating Custom Profiles
+
+1. Copy the template:
+   ```bash
+   cp profiles/custom/template.yaml profiles/custom/my_robot.yaml
+   ```
+
+2. Fill in your robot's specifications
+
+3. Validate:
+   ```bash
+   python3 scripts/validate_profile.py profiles/custom/my_robot.yaml
+   ```
+
+4. Use in your application:
+   ```yaml
+   robot:
+     profile: "profiles/custom/my_robot.yaml"
+   ```
+
+### Benefits
+
+✅ **Standardized Interface** - Same code works across different robots  
+✅ **Safety Built-in** - Profiles include safety limits and constraints  
+✅ **Quick Onboarding** - Switch robots by changing one line  
+✅ **Well-Documented** - Clear specifications for each robot  
+✅ **Validated** - Schema validation ensures correctness  
+
+### Profile Schema
+
+Each profile is a YAML file with the following structure:
+
+```yaml
+# Profile Metadata
+profile:
+  name: "Robot Name"
+  manufacturer: "Manufacturer Name"
+  model: "Model Number"
+  type: "industrial_arm|mobile_robot|humanoid|custom"
+  version: "1.0.0"
+  description: "Brief description"
+
+# Robot Specifications
+specifications:
+  degrees_of_freedom: 6
+  payload: 5.0  # kg
+  reach: 850    # mm
+  weight: 18.4  # kg
+  
+# Standard Topic Mappings (ROS 2)
+topics:
+  # Joint states (sensor_msgs/JointState)
+  joint_states: "/joint_states"
+  
+  # Command interfaces
+  joint_trajectory: "/joint_trajectory_controller/joint_trajectory"
+  velocity_command: "/velocity_controller/command"
+  position_command: "/position_controller/command"
+  
+  # Sensor data
+  force_torque: "/force_torque_sensor"
+  camera_rgb: "/camera/color/image_raw"
+  camera_depth: "/camera/depth/image_raw"
+  lidar: "/scan"
+  imu: "/imu/data"
+  
+  # Robot state
+  robot_status: "/robot_status"
+  error_state: "/error_state"
+
+# Safety Limits
+safety:
+  joint_limits:
+    - name: "joint_1"
+      min: -3.14159  # radians
+      max: 3.14159
+      max_velocity: 2.0  # rad/s
+      max_acceleration: 5.0  # rad/s²
+      max_torque: 150.0  # Nm
+  
+  workspace_limits:
+    x: [-1.0, 1.0]  # meters
+    y: [-1.0, 1.0]
+    z: [0.0, 2.0]
+  
+  emergency_stop:
+    topic: "/emergency_stop"
+    type: "std_msgs/Bool"
+
+# Control Configuration
+control:
+  # Available controllers
+  controllers:
+    - name: "joint_trajectory_controller"
+      type: "position"
+      default: true
+    - name: "velocity_controller"
+      type: "velocity"
+    - name: "force_controller"
+      type: "force"
+  
+  # Control loop rate
+  update_rate: 100  # Hz
+  
+  # PID gains (if applicable)
+  pid_gains:
+    joint_1:
+      p: 100.0
+      i: 0.1
+      d: 10.0
+
+# Calibration
+calibration:
+  required: true
+  procedure: "homing"  # homing|manual|automatic
+  home_position: [0.0, -1.57, 1.57, 0.0, 1.57, 0.0]  # radians
+  calibration_topic: "/calibration_status"
+
+# Blockchain Integration
+blockchain:
+  # Data to store on-chain
+  telemetry:
+    - joint_states
+    - force_torque
+    - robot_status
+  
+  # Update frequency
+  update_interval: 10.0  # seconds
+  
+  # DID metadata
+  metadata:
+    robot_type: "industrial_arm"
+    capabilities: ["pick_and_place", "welding", "assembly"]
+
+# Optional: Custom Parameters
+custom:
+  # Robot-specific parameters
+  tool_offset: [0.0, 0.0, 0.15]  # meters
+  tcp_frame: "tool0"
+  base_frame: "base_link"
+```
+
+### Supported Robot Types
+
+**Industrial Arms:**
+- Universal Robots (UR3, UR5, UR10)
+- KUKA (iiwa, KR series)
+- ABB (IRB series)
+- Franka Emika (Panda)
+
+**Mobile Robots:**
+- Boston Dynamics (Spot)
+- Clearpath (Husky, Jackal)
+- TurtleBot series
+
+**Humanoids:**
+- Unitree (G1, H1)
+- Boston Dynamics (Atlas)
+- PAL Robotics (TALOS)
 
