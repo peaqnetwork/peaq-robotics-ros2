@@ -178,7 +178,7 @@ ros2 run peaq_ros2_core storage_bridge_node --ros-args \
 Notes:
 - If running on a robot, ensure network/firewall allows IPFS API (default 5001) and gateway (8080) locally or adjust config accordingly.
 - Pinata credentials must never be committed; they belong only in your local `peaq_robot.yaml`.
-- macOS: ROS 2 Humble support is limited; prefer Docker. If running natively, use a Linux VM or WSL (on Windows) for best results.
+- Platform note: Native ROS 2 Humble support varies by OS. Docker-based setup is recommended for consistency. If running natively on a non-Linux OS, consider a Linux VM or WSL for best results.
 
 Manual equivalent of Dockerfile steps:
 - Install apt packages: python3-pip, git, curl, wget, editors

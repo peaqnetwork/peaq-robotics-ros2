@@ -214,7 +214,7 @@ vim peaq_ros2_examples/config/peaq_robot.yaml
 
 **Option C: Edit from host machine**
 
-Exit container (Ctrl+D) and edit on your Mac:
+Exit container (Ctrl+D) and edit on your host machine:
 ```bash
 nano peaq_ros2_examples/config/peaq_robot.yaml
 # Then re-enter container: docker exec -it peaq-ros2-test bash
