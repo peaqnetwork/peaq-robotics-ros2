@@ -604,15 +604,15 @@ docker rm peaq-ros2-test
 
 ## Success Criteria
 
-✅ Docker image built with IPFS included
-✅ Single container running (like real machine)
-✅ IPFS daemon running inside container
-✅ All ROS2 packages built
-✅ Core node running and activated
-✅ Wallet auto-generated
-✅ DID created and verified
-✅ Storage bridge running
-✅ Data stored on blockchain
-✅ Data visible via Pinata gateway
+- [x] Docker image built with IPFS included
+- [x] Single container running (like real machine)
+- [x] IPFS daemon running inside container
+- [x] All ROS2 packages built
+- [x] Core node running and activated
+- [x] Wallet auto-generated
+- [x] DID created and verified
+- [x] Storage bridge running
+- [x] Data stored on blockchain
+- [x] Data visible via Pinata gateway
 
 **This is how it would work on a real robot!** 🤖
