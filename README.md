@@ -224,13 +224,6 @@ Troubleshooting on devices:
 
 - **[E2E_TEST.md](./E2E_TEST.md)** - Complete end-to-end testing guide with step-by-step instructions
 
-## Architecture
-
-```
-
-```
-
-
 ## Core Services
 
 ### Identity Management
