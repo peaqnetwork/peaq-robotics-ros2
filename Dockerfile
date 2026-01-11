@@ -13,6 +13,13 @@ RUN apt-get update && apt-get install -y \
     vim \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Node.js (required for Tether WDK integration)
+# We use NodeSource for Node 20.x (works well with modern ESM + ethers v6).
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get update && apt-get install -y nodejs && \
+    node --version && npm --version && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install IPFS (Kubo)
 RUN wget https://dist.ipfs.tech/kubo/v0.38.1/kubo_v0.38.1_linux-amd64.tar.gz && \
     tar -xvzf kubo_v0.38.1_linux-amd64.tar.gz && \

@@ -31,6 +31,9 @@ set(srv_files
   "srv/AccessAssignPermToRole.srv"
   "srv/AccessGrantRole.srv"
   "srv/GetNodeInfo.srv"
+  "srv/TetherCreateWallet.srv"
+  "srv/TetherGetUsdtBalance.srv"
+  "srv/TetherTransferUsdt.srv"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

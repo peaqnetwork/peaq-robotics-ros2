@@ -29,6 +29,81 @@ See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for more details.
 
 ---
 
+## Optional: Tether WDK (peaq EVM USDT) Integration Test
+
+This is a **separate** integration demo that uses Tether WDK’s EVM wallet module to create an EVM wallet and interact with the existing USDT ERC-20 contract on peaq EVM.
+
+### Prerequisites
+
+- Node.js 18+
+- `npm install` executed once:
+
+```bash
+cd /work/peaq_ros2_tether/js
+npm install
+```
+
+### Configure
+
+Copy and edit unified config:
+
+```bash
+cp /work/peaq_ros2_examples/config/peaq_robot.example.yaml \
+   /work/peaq_ros2_examples/config/peaq_robot.yaml
+```
+
+Then set in `peaq_robot.yaml`:
+- `tether.enabled: true`
+- `tether.evm.rpc_url: https://quicknode1.peaq.xyz`
+- `tether.usdt.contract: 0xf4D9235269a96aaDaFc9aDAe454a0618eBE37949`
+
+### Run
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+nohup ros2 run peaq_ros2_tether tether_node --ros-args \
+  -p config.yaml_path:=/work/peaq_ros2_examples/config/peaq_robot.yaml \
+  > /tmp/tether_node.log 2>&1 &
+
+sleep 2
+tail -n 50 /tmp/tether_node.log
+```
+
+In another terminal:
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+# 1) Create wallet
+ros2 service call /peaq_tether_node/wallet/create \
+  peaq_ros2_interfaces/srv/TetherCreateWallet \
+  "{label: 'robot_001', export_mnemonic: false}"
+
+# 2) Check USDT balance (by address)
+ros2 service call /peaq_tether_node/usdt/balance \
+  peaq_ros2_interfaces/srv/TetherGetUsdtBalance \
+  "{wallet_id: '', address: '0x...'}"
+
+# 3) Dry-run USDT transfer (quote)
+ros2 service call /peaq_tether_node/usdt/transfer \
+  peaq_ros2_interfaces/srv/TetherTransferUsdt \
+  "{wallet_id: '...', to_address: '0x...', amount: '0.1', dry_run: true}"
+
+# Optional: run the demo node (separate ROS node that calls the same services)
+ros2 run peaq_ros2_examples tether_demo
+```
+
+### Notes
+
+- Wallet mnemonics are stored locally in a shared registry file (default `~/.peaq_robot/tether_wallets.json`).
+- Mnemonic export is **disabled by default** and should remain disabled in production.
+- If the newly created wallet has **0 USDT**, transfer dry-runs may revert with an expected error like `ERC20: transfer amount exceeds balance`.
+
+---
+
 ## Prerequisites
 
 - Docker installed and running

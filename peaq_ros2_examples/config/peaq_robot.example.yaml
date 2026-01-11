@@ -45,6 +45,36 @@ logging:
   format: human
 
 # =============================================================================
+# TETHER WDK CONFIGURATION (peaq EVM + USDT)
+# =============================================================================
+#
+# This config is consumed by the `peaq_ros2_tether` node.
+# The node shells out to Node.js scripts using `@tetherto/wdk-wallet-evm` and
+# interacts with the configured USDT ERC-20 contract on peaq EVM.
+#
+# IMPORTANT SECURITY NOTES:
+# - Wallet mnemonics are stored locally in ONE shared registry file on the robot.
+# - Do NOT enable mnemonic export in production.
+#
+tether:
+  enabled: false
+
+  # EVM configuration (provider URL). Per Tether WDK docs, provider can be a URL string.
+  evm:
+    # peaq EVM JSON-RPC (QuickNode)
+    rpc_url: "https://quicknode1.peaq.xyz"
+
+  # USDT configuration (existing contract; do not deploy anything new).
+  usdt:
+    contract: "0xf4D9235269a96aaDaFc9aDAe454a0618eBE37949"
+    decimals: 6
+
+  # Shared local registry storing mnemonics for wallets created by the tether node.
+  wallet_registry:
+    path: "~/.peaq_robot/tether_wallets.json"
+    unsafe_export_mnemonic: false
+
+# =============================================================================
 # CORE NODE CONFIGURATION
 # =============================================================================
 

@@ -1,0 +1,17 @@
+# Transfer USDT (ERC-20) on peaq EVM.
+#
+# Security:
+# - Uses wallet_id to sign (server loads mnemonic locally).
+# - Never pass private keys or mnemonic through this service.
+string wallet_id
+string to_address
+# Human amount string (e.g. "1.25"). Server converts using configured decimals.
+string amount
+# If true, do a dry-run estimate/simulate and return status without broadcasting.
+bool dry_run
+---
+string tx_hash
+string status
+bool success
+string error
+

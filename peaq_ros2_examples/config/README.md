@@ -36,6 +36,18 @@ logging:
   level: INFO
   format: human
 
+# Tether WDK integration (optional; peaq EVM USDT)
+tether:
+  enabled: true
+  evm:
+    rpc_url: "https://quicknode1.peaq.xyz"
+  usdt:
+    contract: "0xf4D9235269a96aaDaFc9aDAe454a0618eBE37949"
+    decimals: 6
+  wallet_registry:
+    path: "~/.peaq_robot/tether_wallets.json"
+    unsafe_export_mnemonic: false
+
 # Core node specific
 core_node:
   confirmation_mode: FAST

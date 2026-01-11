@@ -1,0 +1,21 @@
+# Create a new EVM wallet for use with Tether WDK integration.
+#
+# Security:
+# - By default, mnemonics must NOT be returned.
+# - If export_mnemonic=true, the server should only return it when explicitly
+#   allowed by configuration (e.g., env flag) and should still avoid logging it.
+#
+# Optional human label (robot name, component id, etc.)
+string label
+# Request mnemonic export (unsafe; should be gated server-side)
+bool export_mnemonic
+---
+# Opaque local identifier for future operations (maps to a mnemonic stored locally)
+string wallet_id
+# EVM address (0x...)
+string address
+# Empty unless export_mnemonic=true AND server allows unsafe export
+string mnemonic
+bool success
+string error
+

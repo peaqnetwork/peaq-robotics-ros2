@@ -23,7 +23,7 @@ script_files = [
 setup(
     name=package_name,
     version='1.0.0',
-    packages=[package_name],
+    packages=[package_name, package_name + '.scripts'],
     data_files=[
         ('share/ament_index/resource_index/packages', [os.path.join('resource', package_name)]),
         (os.path.join('share', package_name), ['package.xml']),
@@ -36,7 +36,11 @@ setup(
     maintainer_email='robotics@peaq.network',
     description='Example launch files and demo scripts for peaq ROS 2 SDK',
     license='Apache-2.0',
-    entry_points={},
+    entry_points={
+        'console_scripts': [
+            'tether_demo = peaq_ros2_examples.scripts.tether_demo:main',
+        ],
+    },
 )
 
 

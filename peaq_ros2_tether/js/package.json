@@ -1,0 +1,13 @@
+{
+  "name": "peaq-ros2-tether-js",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Node.js CLI used by peaq_ros2_tether to call Tether WDK wallet-evm + ERC20 USDT operations.",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@tetherto/wdk-wallet-evm": "latest",
+    "ethers": "^6.13.0"
+  }
+}
+

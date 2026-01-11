@@ -1,0 +1,13 @@
+# Get USDT (ERC-20) balance on peaq EVM.
+#
+# Provide either wallet_id OR address. If both are provided, wallet_id wins.
+string wallet_id
+string address
+---
+# Raw token balance as a base-10 string (uint256)
+string balance_raw
+# Human formatted balance string (e.g. "12.345678"), derived using configured decimals
+string balance_formatted
+bool success
+string error
+

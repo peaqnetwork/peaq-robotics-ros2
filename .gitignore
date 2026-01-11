@@ -24,10 +24,15 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Node.js
+node_modules/
+
 # Wallet and sensitive files
 *.json
 !package.json
 !**/package.json
+!package-lock.json
+!**/package-lock.json
 peaq_wallet.json
 *_wallet.json
 
@@ -35,6 +40,9 @@ peaq_wallet.json
 peaq_ros2_examples/config/peaq_robot.yaml
 peaq_ros2_examples/config/bridge.yaml
 peaq_ros2_examples/config/e2e_test_bridge.yaml
+
+# Local-only tether E2E guide (keep untracked)
+TETHER_E2E_TEST_LOCAL.md
 
 # Logs and temporary files
 *.log

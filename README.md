@@ -224,6 +224,97 @@ Troubleshooting on devices:
 
 - **[E2E_TEST.md](./E2E_TEST.md)** - Complete end-to-end testing guide with step-by-step instructions
 
+## Tether WDK (peaq EVM USDT) Integration
+
+This repo includes an optional ROS2 node (`peaq_ros2_tether`) that integrates with Tether WDK’s EVM wallet module to:
+- Create EVM wallets (mnemonic stored locally on the robot/machine)
+- Query USDT balance (ERC-20)
+- Transfer USDT on peaq EVM
+
+Constraints/notes:
+- No WDK chain listing changes required (WDK EVM wallet supports arbitrary EVM RPC providers).
+- No smart contract deployments required (uses existing USDT contract).
+- Secrets are stored in a **single local registry file**; do not enable mnemonic export in production.
+
+Setup (once, on the robot/machine):
+
+```bash
+cd peaq_ros2_tether/js
+npm install
+```
+
+Config:
+- Copy `peaq_ros2_examples/config/peaq_robot.example.yaml` to `peaq_robot.yaml`
+- Set:
+  - `tether.enabled: true`
+  - `tether.evm.rpc_url: https://quicknode1.peaq.xyz`
+  - `tether.usdt.contract: 0xf4D9235269a96aaDaFc9aDAe454a0618eBE37949`
+
+Run (same style as core/storage nodes — direct `ros2 run` + direct service calls):
+
+```bash
+ros2 run peaq_ros2_tether tether_node --ros-args \
+  -p config.yaml_path:=/work/peaq_ros2_examples/config/peaq_robot.yaml &
+
+# In another terminal:
+# 1) Create wallet
+ros2 service call /peaq_tether_node/wallet/create \
+  peaq_ros2_interfaces/srv/TetherCreateWallet \
+  "{label: 'robot_001', export_mnemonic: false}"
+
+# 2) Check USDT balance
+# Use the returned wallet_id OR the returned address to query balance.
+ros2 service call /peaq_tether_node/usdt/balance \
+  peaq_ros2_interfaces/srv/TetherGetUsdtBalance \
+  "{wallet_id: '<WALLET_ID>', address: ''}"
+
+ros2 service call /peaq_tether_node/usdt/balance \
+  peaq_ros2_interfaces/srv/TetherGetUsdtBalance \
+  "{wallet_id: '', address: '<EVM_ADDRESS>'}"
+
+# 3) Transfer USDT
+# Dry-run (quote) transfer (does not broadcast)
+ros2 service call /peaq_tether_node/usdt/transfer \
+  peaq_ros2_interfaces/srv/TetherTransferUsdt \
+  "{wallet_id: '<WALLET_ID>', to_address: '<TO_EVM_ADDRESS>', amount: '0.1', dry_run: true}"
+
+# Real transfer (broadcast)
+ros2 service call /peaq_tether_node/usdt/transfer \
+  peaq_ros2_interfaces/srv/TetherTransferUsdt \
+  "{wallet_id: '<WALLET_ID>', to_address: '<TO_EVM_ADDRESS>', amount: '0.1', dry_run: false}"
+```
+
+## Architecture
+
+```
+┌───────────────────────────────────────────────────────────┐
+│                     ROS 2 Application Layer               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   Robot      │  │   Sensors    │  │  Actuators   │     │
+│  │  Control     │  │   & Data     │  │  & Motion    │     │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
+└─────────┼─────────────────┼─────────────────┼─────────────┘
+          │                 │                 │
+          ▼                 ▼                 ▼
+┌───────────────────────────────────────────────────────────┐
+│                    peaq ROS 2 SDK Layer                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │  Core Node   │  │Storage Bridge│  │Humanoid Bridge│    │
+│  │  (Services)  │  │   (IPFS)     │  │  (Control)   │     │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
+└─────────┼─────────────────┼─────────────────┼─────────────┘
+          │                 │                 │
+          ▼                 ▼                 ▼
+┌───────────────────────────────────────────────────────────┐
+│                    peaq Blockchain Layer                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   Identity   │  │   Storage    │  │    Access    │     │
+│  │   Pallet     │  │   Pallet     │  │   Control    │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└───────────────────────────────────────────────────────────┘
+```
+
+
 ## Core Services
 
 ### Identity Management
