@@ -20,7 +20,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import crypto from 'node:crypto';
 
 import { ethers } from 'ethers';
 
@@ -90,8 +89,56 @@ function writeRegistry(regPath, obj) {
   }
 }
 
-function newWalletId() {
-  return crypto.randomBytes(16).toString('hex');
+function toChecksumAddress(addr) {
+  try {
+    return ethers.getAddress(addr);
+  } catch {
+    return '';
+  }
+}
+
+function findRegistryEntry(reg, walletRef) {
+  const ref = (walletRef ?? '').toString().trim();
+  if (!ref) return null;
+
+  // 1) Direct key lookup (supports legacy random wallet_id keys).
+  if (reg?.wallets?.[ref]) return reg.wallets[ref];
+
+  // 2) If walletRef looks like an address, try checksum key + legacy value scan.
+  if (isHexAddress(ref)) {
+    const checksum = toChecksumAddress(ref);
+    if (checksum && reg?.wallets?.[checksum]) return reg.wallets[checksum];
+
+    if (reg?.wallets && typeof reg.wallets === 'object') {
+      for (const v of Object.values(reg.wallets)) {
+        const a = v?.address;
+        if (a && isHexAddress(a) && toChecksumAddress(a) === checksum) return v;
+      }
+    }
+  }
+
+  return null;
+}
+
+function resolveAddressFromWalletRef(reg, walletRef, { allowDirectAddress = false } = {}) {
+  const ref = (walletRef ?? '').toString().trim();
+  const entry = findRegistryEntry(reg, ref);
+  if (!entry) {
+    if (allowDirectAddress && isHexAddress(ref)) return toChecksumAddress(ref);
+    die(`Unknown wallet_id: ${ref}`);
+  }
+  const address = entry.address;
+  if (!isHexAddress(address)) die(`Invalid address in registry for wallet_id=${ref}`);
+  return toChecksumAddress(address);
+}
+
+function resolveMnemonicFromWalletRef(reg, walletRef) {
+  const ref = (walletRef ?? '').toString().trim();
+  const entry = findRegistryEntry(reg, ref);
+  if (!entry) die(`Unknown wallet_id: ${ref}`);
+  const mnemonic = entry.mnemonic;
+  if (!mnemonic) die(`Missing mnemonic in registry for wallet_id=${ref}`);
+  return mnemonic;
 }
 
 function parseArgs(argv) {
@@ -175,11 +222,14 @@ async function cmdWalletCreate(args) {
   const address = account?.address ?? wallet.address;
   if (!isHexAddress(address)) die('Derived invalid EVM address');
 
-  const walletId = newWalletId();
+  // Use EVM address as the wallet reference (so callers can use one identifier everywhere).
+  const checksumAddress = toChecksumAddress(address);
+  if (!checksumAddress) die('Failed to checksum derived EVM address');
+  const walletId = checksumAddress;
   const reg = readRegistry(regPath);
   reg.wallets[walletId] = {
     label,
-    address,
+    address: checksumAddress,
     mnemonic, // stored locally only
     created_at: Math.floor(Date.now() / 1000),
   };
@@ -188,25 +238,9 @@ async function cmdWalletCreate(args) {
   const allowExport = unsafeExport && exportMnemonicRequested;
   ok({
     wallet_id: walletId,
-    address,
+    address: checksumAddress,
     mnemonic: allowExport ? mnemonic : '',
   });
-}
-
-async function resolveAddressFromWalletId(reg, walletId) {
-  const entry = reg.wallets?.[walletId];
-  if (!entry) die(`Unknown wallet_id: ${walletId}`);
-  const address = entry.address;
-  if (!isHexAddress(address)) die(`Invalid address in registry for wallet_id=${walletId}`);
-  return address;
-}
-
-async function resolveMnemonicFromWalletId(reg, walletId) {
-  const entry = reg.wallets?.[walletId];
-  if (!entry) die(`Unknown wallet_id: ${walletId}`);
-  const mnemonic = entry.mnemonic;
-  if (!mnemonic) die(`Missing mnemonic in registry for wallet_id=${walletId}`);
-  return mnemonic;
 }
 
 async function cmdUsdtBalance(args) {
@@ -221,7 +255,7 @@ async function cmdUsdtBalance(args) {
   const addressArg = (args.address ?? '').toString().trim();
 
   const reg = readRegistry(regPath);
-  const address = walletId ? await resolveAddressFromWalletId(reg, walletId) : addressArg;
+  const address = walletId ? resolveAddressFromWalletRef(reg, walletId, { allowDirectAddress: true }) : addressArg;
   if (!isHexAddress(address)) die('Invalid address');
 
   let decimals = decimalsDefault;
@@ -266,7 +300,7 @@ async function cmdUsdtTransfer(args) {
   if (!amountStr) die('amount is required');
 
   const reg = readRegistry(regPath);
-  const mnemonic = await resolveMnemonicFromWalletId(reg, walletId);
+  const mnemonic = resolveMnemonicFromWalletRef(reg, walletId);
 
   const account = new WalletAccountEvm(mnemonic, DEFAULT_DERIVATION_PATH, { provider: rpcUrl });
 
