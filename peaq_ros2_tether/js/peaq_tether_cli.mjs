@@ -181,6 +181,16 @@ function formatUnitsSafe(value, decimals) {
   }
 }
 
+function isAlreadyKnownRpcError(e) {
+  const msg = (e?.error?.message ?? e?.message ?? e?.shortMessage ?? '').toString().toLowerCase();
+  return msg.includes('already known');
+}
+
+function extractRawTxFromRpcError(e) {
+  const raw = e?.payload?.params?.[0];
+  return typeof raw === 'string' && raw.startsWith('0x') ? raw : '';
+}
+
 const ERC20_ABI = [
   'function balanceOf(address account) view returns (uint256)',
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -304,11 +314,28 @@ async function cmdUsdtTransfer(args) {
     });
   }
 
-  ok({
-    tx_hash: (await account.transfer({ token: usdt, recipient: to, amount: value })).hash ?? '',
-    status: 'SENT',
-    block_number: 0,
-  });
+  try {
+    const sent = await account.transfer({ token: usdt, recipient: to, amount: value });
+    ok({
+      tx_hash: sent?.hash ?? '',
+      status: 'SENT',
+      block_number: 0,
+    });
+  } catch (e) {
+    // Some RPC providers respond with "already known" if the exact same raw tx
+    // is re-broadcast. Treat this as success and return the tx hash so callers
+    // can track it.
+    if (isAlreadyKnownRpcError(e)) {
+      const raw = extractRawTxFromRpcError(e);
+      const txHash = raw ? ethers.keccak256(raw) : '';
+      ok({
+        tx_hash: txHash,
+        status: 'ALREADY_KNOWN',
+        note: 'RPC reported already known; transaction was already broadcast (mempool).',
+      });
+    }
+    die(`Transfer failed: ${e?.shortMessage || e?.message || e}`);
+  }
 }
 
 async function main() {
@@ -327,5 +354,9 @@ async function main() {
   die(`Unknown command: ${group} ${action}`);
 }
 
-await main();
+try {
+  await main();
+} catch (e) {
+  die(`Unhandled error: ${e?.shortMessage || e?.message || e}`);
+}
 
