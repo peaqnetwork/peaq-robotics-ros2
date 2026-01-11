@@ -23,6 +23,15 @@ import os from 'node:os';
 
 import { ethers } from 'ethers';
 
+// Optional import of WDK core for seed phrase generation.
+let WDK = null;
+try {
+  const mod = await import('@tetherto/wdk');
+  WDK = mod?.default ?? mod?.WDK ?? null;
+} catch (_) {
+  // fallback handled where needed
+}
+
 // Best-effort import of Tether WDK wallet module (keeps integration honest).
 // If dependency is missing, we still error clearly.
 let WalletAccountEvm = null;
@@ -157,14 +166,6 @@ function requireEnv(name) {
   return v;
 }
 
-function getProvider(rpcUrl) {
-  try {
-    return new ethers.JsonRpcProvider(rpcUrl);
-  } catch (e) {
-    die(`Invalid RPC URL/provider: ${e?.message || e}`);
-  }
-}
-
 function isHexAddress(addr) {
   try {
     return ethers.isAddress(addr);
@@ -191,12 +192,6 @@ function extractRawTxFromRpcError(e) {
   return typeof raw === 'string' && raw.startsWith('0x') ? raw : '';
 }
 
-const ERC20_ABI = [
-  'function balanceOf(address account) view returns (uint256)',
-  'function transfer(address to, uint256 amount) returns (bool)',
-  'function decimals() view returns (uint8)',
-];
-
 const DEFAULT_DERIVATION_PATH = "0'/0/0";
 
 async function cmdWalletCreate(args) {
@@ -210,16 +205,16 @@ async function cmdWalletCreate(args) {
   const label = (args.label ?? 'robot_wallet').toString();
   const exportMnemonicRequested = (args['export-mnemonic'] ?? 'false').toString().toLowerCase() === 'true';
 
-  // Generate a BIP-39 seed phrase. We use ethers here; WDK wallet-evm also supports BIP-39.
-  const wallet = ethers.Wallet.createRandom();
-  const mnemonic = wallet.mnemonic?.phrase;
+  // Generate a BIP-39 seed phrase using WDK core when available.
+  // (We keep a safe fallback to ethers for robustness.)
+  const mnemonic = typeof WDK?.getRandomSeedPhrase === 'function' ? WDK.getRandomSeedPhrase() : ethers.Wallet.createRandom().mnemonic?.phrase;
   if (!mnemonic) die('Failed to generate mnemonic');
 
   const rpcUrl = requireEnv('PEAQ_TETHER_EVM_RPC');
   // Instantiate WDK wallet account to validate provider configuration and derivation.
   // WDK constructor signature: (seedPhraseOrSeedBytes, path, config)
   const account = new WalletAccountEvm(mnemonic, DEFAULT_DERIVATION_PATH, { provider: rpcUrl });
-  const address = account?.address ?? wallet.address;
+  const address = account?.address ?? (typeof account?.getAddress === 'function' ? await account.getAddress() : '');
   if (!isHexAddress(address)) die('Derived invalid EVM address');
 
   // Use EVM address as the wallet reference (so callers can use one identifier everywhere).
@@ -244,30 +239,22 @@ async function cmdWalletCreate(args) {
 async function cmdUsdtBalance(args) {
   const rpcUrl = requireEnv('PEAQ_TETHER_EVM_RPC');
   const usdt = requireEnv('PEAQ_TETHER_USDT_CONTRACT');
-  const regPath = normalizePath(getenv('PEAQ_TETHER_WALLET_REGISTRY', '~/.peaq_robot/tether_wallets.json'));
   const decimalsDefault = parseInt(getenv('PEAQ_TETHER_USDT_DECIMALS', '6'), 10);
 
   if (!isHexAddress(usdt)) die('Invalid USDT contract address');
 
   const address = normalizeAddressOrDie(args.address, 'address');
 
-  let decimals = decimalsDefault;
-  let bal = 0n;
-  if (WalletAccountReadOnlyEvm) {
-    const ro = new WalletAccountReadOnlyEvm(address, { provider: rpcUrl });
-    bal = await ro.getTokenBalance(usdt);
-  } else {
-    const provider = getProvider(rpcUrl);
-    const contract = new ethers.Contract(usdt, ERC20_ABI, provider);
-    try {
-      decimals = Number(await contract.decimals());
-    } catch (_) {}
-    bal = await contract.balanceOf(address);
+  if (!WalletAccountReadOnlyEvm) {
+    die('Missing WalletAccountReadOnlyEvm in @tetherto/wdk-wallet-evm. Please update dependencies in peaq_ros2_tether/js.');
   }
+
+  const ro = new WalletAccountReadOnlyEvm(address, { provider: rpcUrl });
+  const bal = await ro.getTokenBalance(usdt);
   ok({
     address,
     balance_raw: bal.toString(),
-    balance_formatted: formatUnitsSafe(bal, decimals),
+    balance_formatted: formatUnitsSafe(bal, decimalsDefault),
   });
 }
 
