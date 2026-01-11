@@ -263,27 +263,20 @@ ros2 service call /peaq_tether_node/wallet/create \
   "{label: 'robot_001', export_mnemonic: false}"
 
 # 2) Check USDT balance
-# You can pass either:
-# - wallet_id (for new wallets, this is the wallet address), OR
-# - address directly
 ros2 service call /peaq_tether_node/usdt/balance \
   peaq_ros2_interfaces/srv/TetherGetUsdtBalance \
-  "{wallet_id: '<WALLET_ADDRESS>', address: ''}"
-
-ros2 service call /peaq_tether_node/usdt/balance \
-  peaq_ros2_interfaces/srv/TetherGetUsdtBalance \
-  "{wallet_id: '', address: '<EVM_ADDRESS>'}"
+  "{address: '<WALLET_ADDRESS>'}"
 
 # 3) Transfer USDT
 # Dry-run (quote) transfer (does not broadcast)
 ros2 service call /peaq_tether_node/usdt/transfer \
   peaq_ros2_interfaces/srv/TetherTransferUsdt \
-  "{wallet_id: '<WALLET_ADDRESS>', to_address: '<TO_EVM_ADDRESS>', amount: '0.1', dry_run: true}"
+  "{from_address: '<WALLET_ADDRESS>', to_address: '<TO_EVM_ADDRESS>', amount: '0.1', dry_run: true}"
 
 # Real transfer (broadcast)
 ros2 service call /peaq_tether_node/usdt/transfer \
   peaq_ros2_interfaces/srv/TetherTransferUsdt \
-  "{wallet_id: '<WALLET_ADDRESS>', to_address: '<TO_EVM_ADDRESS>', amount: '0.1', dry_run: false}"
+  "{from_address: '<WALLET_ADDRESS>', to_address: '<TO_EVM_ADDRESS>', amount: '0.1', dry_run: false}"
 ```
 
 ## Architecture

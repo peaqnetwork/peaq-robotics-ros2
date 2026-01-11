@@ -38,30 +38,17 @@ class _Demo(Node):
         if not res or not res.success:
             self.get_logger().error(f'CreateWallet failed: {getattr(res, "error", "")}')
             return 3
-        self.get_logger().info(f'Created wallet_id={res.wallet_id} address={res.address}')
+        self.get_logger().info(f'Created address={res.address}')
 
         # 2) USDT balance
         breq = TetherGetUsdtBalance.Request()
-        breq.wallet_id = res.wallet_id
-        breq.address = ''
+        breq.address = res.address
         bfut = self.balance_cli.call_async(breq)
         rclpy.spin_until_future_complete(self, bfut)
         bres = bfut.result()
         if not bres or not bres.success:
-            err = getattr(bres, "error", "")
-            # In dev environments, multiple tether nodes might be running; if the call is handled
-            # by a different instance, wallet_id may not exist in its registry. Address-based
-            # balance is still a valid integration demonstration, so we fall back.
-            self.get_logger().warn(f'Balance by wallet_id failed: {err} (falling back to address)')
-            breq2 = TetherGetUsdtBalance.Request()
-            breq2.wallet_id = ''
-            breq2.address = res.address
-            bfut2 = self.balance_cli.call_async(breq2)
-            rclpy.spin_until_future_complete(self, bfut2)
-            bres = bfut2.result()
-            if not bres or not bres.success:
-                self.get_logger().error(f'Balance failed: {getattr(bres, "error", "")}')
-                return 4
+            self.get_logger().error(f'Balance failed: {getattr(bres, "error", "")}')
+            return 4
         self.get_logger().info(f'USDT balance: raw={bres.balance_raw} formatted={bres.balance_formatted}')
 
         # 3) Optional: Dry-run USDT transfer (only if balance > 0).
@@ -74,7 +61,7 @@ class _Demo(Node):
 
         if has_funds:
             treq = TetherTransferUsdt.Request()
-            treq.wallet_id = res.wallet_id
+            treq.from_address = res.address
             treq.to_address = res.address
             treq.amount = '0.01'
             treq.dry_run = True

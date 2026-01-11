@@ -108,7 +108,6 @@ class TetherNode(Node):
             response.error = res.error
             return response
 
-        response.wallet_id = str(res.data.get('wallet_id') or '')
         response.address = str(res.data.get('address') or '')
         response.mnemonic = str(res.data.get('mnemonic') or '') if export else ''
         response.success = True
@@ -121,9 +120,13 @@ class TetherNode(Node):
             response.error = 'tether.enabled=false'
             return response
 
-        wallet_id = (request.wallet_id or '').strip()
         address = (request.address or '').strip()
-        res = self._client.get_usdt_balance(wallet_id=wallet_id, address=address)
+        if not address:
+            response.success = False
+            response.error = 'address is required'
+            return response
+
+        res = self._client.get_usdt_balance(address=address)
         if not res.ok:
             response.success = False
             response.error = res.error
@@ -141,14 +144,14 @@ class TetherNode(Node):
             response.error = 'tether.enabled=false'
             return response
 
-        wallet_id = (request.wallet_id or '').strip()
+        from_address = (request.from_address or '').strip()
         to_address = (request.to_address or '').strip()
         amount = (request.amount or '').strip()
         dry_run = bool(request.dry_run)
 
-        if not wallet_id:
+        if not from_address:
             response.success = False
-            response.error = 'wallet_id is required'
+            response.error = 'from_address is required'
             return response
         if not to_address:
             response.success = False
@@ -159,7 +162,7 @@ class TetherNode(Node):
             response.error = 'amount is required'
             return response
 
-        res = self._client.transfer_usdt(wallet_id=wallet_id, to_address=to_address, amount=amount, dry_run=dry_run)
+        res = self._client.transfer_usdt(from_address=from_address, to_address=to_address, amount=amount, dry_run=dry_run)
         if not res.ok:
             response.success = False
             response.error = res.error

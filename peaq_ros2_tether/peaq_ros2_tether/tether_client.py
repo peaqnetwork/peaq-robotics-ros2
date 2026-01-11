@@ -93,20 +93,17 @@ class TetherWDKClient:
     def create_wallet(self, *, label: str, export_mnemonic: bool) -> TetherCliResult:
         return self._run(['wallet', 'create', '--label', label, '--export-mnemonic', 'true' if export_mnemonic else 'false'])
 
-    def get_usdt_balance(self, *, wallet_id: str = '', address: str = '') -> TetherCliResult:
+    def get_usdt_balance(self, *, address: str) -> TetherCliResult:
         args = ['usdt', 'balance']
-        if wallet_id:
-            args += ['--wallet-id', wallet_id]
-        if address:
-            args += ['--address', address]
+        args += ['--address', address]
         return self._run(args)
 
-    def transfer_usdt(self, *, wallet_id: str, to_address: str, amount: str, dry_run: bool) -> TetherCliResult:
+    def transfer_usdt(self, *, from_address: str, to_address: str, amount: str, dry_run: bool) -> TetherCliResult:
         return self._run([
             'usdt',
             'transfer',
-            '--wallet-id',
-            wallet_id,
+            '--from',
+            from_address,
             '--to',
             to_address,
             '--amount',

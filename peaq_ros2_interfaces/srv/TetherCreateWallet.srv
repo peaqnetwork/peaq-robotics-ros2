@@ -10,8 +10,6 @@ string label
 # Request mnemonic export (unsafe; should be gated server-side)
 bool export_mnemonic
 ---
-# Opaque local identifier for future operations (maps to a mnemonic stored locally)
-string wallet_id
 # EVM address (0x...)
 string address
 # Empty unless export_mnemonic=true AND server allows unsafe export

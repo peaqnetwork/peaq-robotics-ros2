@@ -1,7 +1,5 @@
 # Get USDT (ERC-20) balance on peaq EVM.
 #
-# Provide either wallet_id OR address. If both are provided, wallet_id wins.
-string wallet_id
 string address
 ---
 # Raw token balance as a base-10 string (uint256)
