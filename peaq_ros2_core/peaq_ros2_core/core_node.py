@@ -8,6 +8,7 @@ import os
 import json
 import time
 import random
+import re
 import rclpy
 from rclpy.node import Node
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -44,6 +45,7 @@ class CoreNode(LifecycleNode):
         # Declare parameters
         self.declare_parameter('config.yaml_path', '')
         self.declare_parameter('network', 'agung')
+        self.declare_parameter('network_fallbacks', [])
         self.declare_parameter('keystore.path', '')
         self.declare_parameter('log_level', 'INFO')
 
@@ -66,6 +68,11 @@ class CoreNode(LifecycleNode):
         # Publishers
         self._tx_status_publisher = None
 
+        # Network fallback state
+        self._network_candidates = []
+        self._network_index = 0
+        self._active_network_url = None
+
         # Optional autostart without lifecycle transitions (for dev/offline mode)
         if os.getenv('PEAQ_ROS2_AUTOSTART', 'false').lower() == 'true':
             try:
@@ -85,6 +92,9 @@ class CoreNode(LifecycleNode):
 
             self.config = load_config_from_params(params)
             self.logger = setup_logging(self.config)
+
+            self._network_candidates = self.config.network_candidates()
+            self._network_index = 0
 
             # Initialize peaq robot SDK
             self._initialize_robot_sdk()
@@ -151,42 +161,67 @@ class CoreNode(LifecycleNode):
         self.logger.info('👋 Core node shutdown')
         return TransitionCallbackReturn.SUCCESS
 
-    def _initialize_robot_sdk(self):
-        """Initialize the peaq robot SDK."""
+    def _initialize_robot_sdk(self, start_index: int = 0):
+        """Initialize the peaq robot SDK (with network fallbacks)."""
         try:
             # Get keystore password from environment
             password = self.config.keystore_password
 
-            # Handle auto-generate wallet
-            keystore_path = self.config.keystore_path
-            if self.config.keystore_auto_generate:
-                keystore_path = self._handle_auto_generate_wallet(keystore_path)
-
             # Offline mode to avoid network access during local dev/testing
             if os.getenv('PEAQ_ROBOT_OFFLINE', 'false').lower() == 'true':
                 self.robot_sdk = self._create_mock_robot_sdk()
-            else:
-                self.robot_sdk = PeaqRobot(
-                    network=self.config.network_url,
-                    keystore_path=keystore_path
-                )
+                self._active_network_url = 'offline'
+                return
 
-            self.logger.info(f'🔑 Core node wallet address: {self.robot_sdk.address}')
+            candidates = self.config.network_candidates()
+            if not candidates:
+                candidates = [self.config.network_url]
 
-            # Set password if provided
-            if password:
-                # Note: This is a simplified approach. In production,
-                # you might need to handle keystore unlocking differently
-                self.logger.info('🔑 Keystore password provided via environment')
+            last_error = None
+            for idx in range(start_index, len(candidates)):
+                url = candidates[idx]
+                try:
+                    # Handle auto-generate wallet (only generates if missing)
+                    keystore_path = self.config.keystore_path
+                    if self.config.keystore_auto_generate:
+                        keystore_path = self._handle_auto_generate_wallet(keystore_path, url)
+                    else:
+                        keystore_path = os.path.expanduser(keystore_path)
 
-            self.logger.info(f'🔗 Connected to {self.config.network} network')
+                    self.robot_sdk = PeaqRobot(
+                        network=url,
+                        keystore_path=keystore_path
+                    )
+
+                    self._network_index = idx
+                    self._active_network_url = url
+                    self.config.network_url = url
+                    if url.startswith('ws://') or url.startswith('wss://'):
+                        self.config.network = url
+
+                    self.logger.info(f'🔑 Core node wallet address: {self.robot_sdk.address}')
+
+                    # Set password if provided
+                    if password:
+                        # Note: This is a simplified approach. In production,
+                        # you might need to handle keystore unlocking differently
+                        self.logger.info('🔑 Keystore password provided via environment')
+
+                    self.logger.info(f'🔗 Connected to {self.config.network} network')
+                    return
+                except Exception as e:
+                    last_error = e
+                    self.get_logger().warning(f'Failed to connect to network {url}: {e}')
+                    continue
+
+            raise RuntimeError(f'Failed to initialize robot SDK: {last_error}')
 
         except Exception as e:
             error_msg = f'Failed to initialize robot SDK: {str(e)}'
             self.get_logger().error(error_msg)
             raise RuntimeError(error_msg)
 
-    def _handle_auto_generate_wallet(self, wallet_path: str) -> str:
+    def _handle_auto_generate_wallet(self, wallet_path: str, network_url: str = None) -> str:
         """Handle auto-generate wallet logic.
         
         If wallet exists: use it (log warning)
@@ -212,7 +247,7 @@ class CoreNode(LifecycleNode):
         # Generate using PeaqRobot (it will auto-generate and save)
         from peaq_robot import PeaqRobot
         temp_robot = PeaqRobot(
-            network=self.config.network_url,
+            network=network_url or self.config.network_url,
             keystore_path=expanded_path
         )
         
@@ -220,6 +255,114 @@ class CoreNode(LifecycleNode):
         self.logger.info(f'   Address: {temp_robot.address}')
         
         return expanded_path
+
+    def _is_network_error(self, error: Exception) -> bool:
+        msg = str(error).lower()
+        needles = [
+            'expecting value',
+            'connection',
+            'timed out',
+            'timeout',
+            'connection reset',
+            'connection refused',
+            'remote host was lost',
+            'websocket',
+            'socket is already closed',
+            'rpc error',
+            'invalid json',
+            '502',
+            '503',
+            '504',
+        ]
+        return any(needle in msg for needle in needles)
+
+    def _is_attribute_exists_error(self, error: Exception) -> bool:
+        msg = str(error).lower()
+        return 'attributealreadyexist' in msg or 'attribute already exist' in msg
+
+    def _is_duplicate_tx_error(self, error: Exception) -> bool:
+        msg = str(error).lower()
+        needles = [
+            'priority is too low',
+            'transaction is outdated',
+            'already in the pool',
+        ]
+        return any(needle in msg for needle in needles)
+
+    def _identity_exists(self) -> bool:
+        for attempt in range(2):
+            try:
+                doc = self.robot_sdk.id.read_identity()
+            except Exception as exc:
+                if attempt == 0 and self._is_network_error(exc):
+                    if self._switch_to_next_network():
+                        continue
+                    self._initialize_robot_sdk(start_index=self._network_index)
+                    continue
+                self.logger.debug(f'Identity read failed during exists check: {exc}')
+                return False
+            if not isinstance(doc, dict):
+                return False
+            if doc.get('exists') is True:
+                return True
+            if doc.get('read_status') == 'success':
+                return True
+            return False
+        return False
+
+    def _switch_to_next_network(self) -> bool:
+        candidates = self.config.network_candidates()
+        if not candidates:
+            return False
+        next_index = (self._network_index or 0) + 1
+        if next_index >= len(candidates):
+            return False
+        self.logger.warning(f'Switching network to fallback: {candidates[next_index]}')
+        self._initialize_robot_sdk(start_index=next_index)
+        return True
+
+    def _normalize_tx_hash(self, tx_hash) -> str:
+        try:
+            if isinstance(tx_hash, dict):
+                tx_hash = tx_hash.get('tx_hash') or tx_hash.get('txHash') or tx_hash.get('hash')
+            elif hasattr(tx_hash, 'tx_hash'):
+                tx_hash = getattr(tx_hash, 'tx_hash')
+            elif hasattr(tx_hash, 'txHash'):
+                tx_hash = getattr(tx_hash, 'txHash')
+            elif hasattr(tx_hash, 'hash'):
+                tx_hash = getattr(tx_hash, 'hash')
+        except Exception:
+            pass
+        if not isinstance(tx_hash, str):
+            tx_hash = str(tx_hash)
+        try:
+            m = re.search(r"0x[a-fA-F0-9]{64}", tx_hash or "")
+            if m:
+                return m.group(0)
+        except Exception:
+            pass
+        return tx_hash or ''
+
+    def _metadata_to_did_document(self, metadata_json: str):
+        metadata_json = metadata_json or ''
+        if not metadata_json.strip():
+            return None
+        try:
+            metadata_obj = json.loads(metadata_json)
+        except Exception:
+            metadata_obj = {"raw": metadata_json}
+        if isinstance(metadata_obj, dict):
+            doc = dict(metadata_obj)
+            if "verificationMethod" in doc and "verificationMethods" not in doc:
+                doc["verificationMethods"] = doc.pop("verificationMethod")
+            if "service" in doc and "services" not in doc:
+                doc["services"] = doc.pop("service")
+            if "authentication" in doc and "authentications" not in doc:
+                doc["authentications"] = doc.pop("authentication")
+            if not any(k in doc for k in ("id", "controller", "verificationMethods", "authentications", "services", "signature")):
+                doc = {"services": [{"id": "#metadata", "type": "peaqMetadata", "data": json.dumps(doc)}]}
+            return doc
+        return {"services": [{"id": "#metadata", "type": "peaqMetadata", "data": json.dumps(metadata_obj)}]}
 
     def _create_mock_robot_sdk(self):
         """Create a minimal mock of the peaq_robot SDK for offline testing."""
@@ -367,13 +510,24 @@ class CoreNode(LifecycleNode):
             # Auto-derive DID name from wallet address
             did_name = f'did:peaq:{self.robot_sdk.address}'
             self.logger.info(f'Creating identity: {did_name}')
+            if self._identity_exists():
+                self.logger.warning(
+                    f'Identity already exists for {did_name}. Use identity/read instead of create.'
+                )
+                response.tx_hash = ''
+                log_identity_operation(self.logger, 'exists', did_name, success=True)
+                return response
+            did_document = self._metadata_to_did_document(request.metadata_json or '')
 
             # Create identity using SDK
             tx_hash = self.robot_sdk.id.create_identity(
                 name=did_name,
-                metadata=request.metadata_json,
+                did_document=did_document,
                 confirmation_mode=self.config.default_confirmation_mode
             )
+            tx_hash = self._normalize_tx_hash(tx_hash)
+            if not tx_hash:
+                raise RuntimeError('identity create returned empty tx_hash')
 
             response.tx_hash = tx_hash
 
@@ -386,10 +540,75 @@ class CoreNode(LifecycleNode):
             self.logger.info(f'✅ Identity creation initiated: {tx_hash[:8]}...')
 
         except Exception as e:
+            if self._identity_exists():
+                self.logger.warning(
+                    f'Identity already exists for {did_name}. Use identity/read instead of create.'
+                )
+                response.tx_hash = ''
+                log_identity_operation(self.logger, 'exists', did_name, success=True)
+                return response
+            if self._is_attribute_exists_error(e):
+                self.logger.warning(
+                    f'Identity already exists for {did_name}. Use identity/read instead of create.'
+                )
+                response.tx_hash = ''
+                log_identity_operation(self.logger, 'exists', did_name, success=True)
+                return response
+            if self._is_duplicate_tx_error(e):
+                self.logger.warning(
+                    f'Identity creation already pending for {did_name}. Try identity/read or retry later.'
+                )
+                response.tx_hash = ''
+                log_identity_operation(self.logger, 'exists', did_name, success=True)
+                return response
+
             error_msg = f'Failed to create identity: {str(e)}'
             self.logger.error(error_msg)
+            # Retry once with a fresh SDK/session (and fallback network if available)
+            try:
+                if self._is_network_error(e) and self._switch_to_next_network():
+                    self.logger.info('Retrying identity create on fallback network')
+                else:
+                    self.logger.info('Retrying identity create after SDK reinit')
+                    self._initialize_robot_sdk(start_index=self._network_index)
+
+                tx_hash = self.robot_sdk.id.create_identity(
+                    name=did_name,
+                    did_document=self._metadata_to_did_document(request.metadata_json or ''),
+                    confirmation_mode=self.config.default_confirmation_mode
+                )
+                tx_hash = self._normalize_tx_hash(tx_hash)
+                if not tx_hash:
+                    raise RuntimeError('identity create returned empty tx_hash')
+                response.tx_hash = tx_hash
+                log_identity_operation(self.logger, 'created', did_name, tx_hash, success=True)
+                self._publish_tx_status('PENDING', tx_hash)
+                self.logger.info(f'✅ Identity creation initiated: {tx_hash[:8]}...')
+                return response
+            except Exception as e2:
+                if self._identity_exists():
+                    self.logger.warning(
+                        f'Identity already exists for {did_name}. Use identity/read instead of create.'
+                    )
+                    response.tx_hash = ''
+                    log_identity_operation(self.logger, 'exists', did_name, success=True)
+                    return response
+                if self._is_attribute_exists_error(e2):
+                    self.logger.warning(
+                        f'Identity already exists for {did_name}. Use identity/read instead of create.'
+                    )
+                    response.tx_hash = ''
+                    log_identity_operation(self.logger, 'exists', did_name, success=True)
+                    return response
+                if self._is_duplicate_tx_error(e2):
+                    self.logger.warning(
+                        f'Identity creation already pending for {did_name}. Try identity/read or retry later.'
+                    )
+                    response.tx_hash = ''
+                    log_identity_operation(self.logger, 'exists', did_name, success=True)
+                    return response
+                self.logger.error(f'Failed to create identity (retry): {str(e2)}')
             response.tx_hash = ''
-            did_name = f'did:peaq:{self.robot_sdk.address}'
             log_identity_operation(self.logger, 'creation_failed', did_name, success=False)
 
         return response
@@ -410,6 +629,20 @@ class CoreNode(LifecycleNode):
         except Exception as e:
             error_msg = f'Failed to read identity: {str(e)}'
             self.logger.error(error_msg)
+            # Retry once with fallback network if available
+            try:
+                if self._is_network_error(e) and self._switch_to_next_network():
+                    self.logger.info('Retrying identity read on fallback network')
+                else:
+                    self.logger.info('Retrying identity read after SDK reinit')
+                    self._initialize_robot_sdk(start_index=self._network_index)
+                doc = self.robot_sdk.id.read_identity()
+                response.doc_json = json.dumps(doc, indent=2)
+                log_identity_operation(self.logger, 'read', success=True)
+                self.logger.info('✅ Identity document retrieved')
+                return response
+            except Exception as e2:
+                self.logger.error(f'Failed to read identity (retry): {str(e2)}')
             response.doc_json = '{}'
             log_identity_operation(self.logger, 'read_failed', success=False)
 

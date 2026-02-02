@@ -3,6 +3,7 @@ Configuration management for peaq_ros2_core package.
 Provides validated parameter parsing and defaults.
 """
 import os
+import json
 from typing import Optional
 from dataclasses import dataclass, field
 
@@ -29,6 +30,29 @@ def resolve_network_url(network: str) -> str:
     return mappings.get(net.lower(), net)
 
 
+def _parse_network_fallbacks(raw) -> list:
+    if raw is None:
+        return []
+    if isinstance(raw, (list, tuple)):
+        items = raw
+    else:
+        raw_str = str(raw).strip()
+        if not raw_str:
+            return []
+        if raw_str.startswith('[') and raw_str.endswith(']'):
+            try:
+                obj = json.loads(raw_str)
+                if isinstance(obj, list):
+                    items = obj
+                else:
+                    items = [raw_str]
+            except Exception:
+                items = raw_str.replace(';', ',').split(',')
+        else:
+            items = raw_str.replace(';', ',').split(',')
+    return [str(item).strip() for item in items if str(item).strip()]
+
+
 def get_default_keystore_path() -> str:
     """Return a sensible default keystore path under the user's home directory."""
     return os.path.expanduser('~/.peaq_robot/wallet.json')
@@ -40,6 +64,7 @@ class PeaqRosConfig:
 
     # Network configuration
     network: str = field(default_factory=lambda: os.getenv('PEAQ_ROBOT_NETWORK', 'agung'))
+    network_fallbacks: list = field(default_factory=lambda: _parse_network_fallbacks(os.getenv('PEAQ_ROBOT_NETWORK_FALLBACKS', '')))
 
     # Confirmation mode for transactions
     default_confirmation_mode: str = field(default_factory=lambda: os.getenv('PEAQ_ROBOT_CONFIRMATION_MODE', 'FAST'))
@@ -79,6 +104,24 @@ class PeaqRosConfig:
 
         # Resolve network URL
         self.network_url = resolve_network_url(self.network)
+        self.network_fallbacks = _parse_network_fallbacks(self.network_fallbacks)
+        fallback_urls = [resolve_network_url(item) for item in self.network_fallbacks]
+        # Drop empty and primary duplicates
+        filtered = []
+        for url in fallback_urls:
+            if not url or url == self.network_url:
+                continue
+            if url not in filtered:
+                filtered.append(url)
+        self.network_fallback_urls = filtered
+
+    def network_candidates(self) -> list:
+        urls = [self.network_url] + list(getattr(self, 'network_fallback_urls', []))
+        out = []
+        for url in urls:
+            if url and url not in out:
+                out.append(url)
+        return out
 
     @property
     def keystore_password(self) -> Optional[str]:
@@ -90,6 +133,7 @@ class PeaqRosConfig:
         return {
             'network': self.network,
             'network_url': self.network_url,
+            'network_fallbacks': self.network_fallbacks,
             'default_confirmation_mode': self.default_confirmation_mode,
             'keystore_path': self.keystore_path,
             'keystore_password_env': self.keystore_password_env,
@@ -108,6 +152,7 @@ def load_config_from_params(params) -> PeaqRosConfig:
     # Map ROS parameters to config fields
     param_mapping = {
         'network': 'network',
+        'network_fallbacks': 'network_fallbacks',
         'default_confirmation_mode': 'default_confirmation_mode',
         'keystore.path': 'keystore_path',
         'keystore.password_env': 'keystore_password_env',
@@ -136,6 +181,10 @@ def load_config_from_params(params) -> PeaqRosConfig:
             # Network (shared, top-level)
             if 'network' in data:
                 config_dict['network'] = data['network']
+            if 'network_fallbacks' in data:
+                config_dict['network_fallbacks'] = data['network_fallbacks']
+            elif 'networkFallbacks' in data:
+                config_dict['network_fallbacks'] = data['networkFallbacks']
             
             # Logging (shared, can be top-level or nested)
             logging = data.get('logging', {})

@@ -16,6 +16,14 @@
 # Options: agung (testnet), peaq (mainnet), or custom WSS URL
 network: agung
 
+# Optional fallback RPCs (used if the primary network endpoint fails)
+# Accepts a YAML list or CSV string.
+network_fallbacks:
+  - wss://quicknode1.peaq.xyz
+  - wss://quicknode2.peaq.xyz
+  - wss://peaq.api.onfinality.io/public-ws
+  - wss://peaq-rpc.publicnode.com
+
 # Wallet configuration (shared by all nodes)
 wallet:
   # Path to wallet JSON file (uses Sr25519 - Substrate/Polkadot standard)
@@ -242,5 +250,4 @@ humanoids:
 # logging:
 #   level: DEBUG
 #   format: json
-
 
