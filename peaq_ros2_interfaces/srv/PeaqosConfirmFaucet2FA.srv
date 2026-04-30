@@ -1,0 +1,12 @@
+# Confirm peaqOS gas-station 2FA with the current TOTP code.
+#
+# Security:
+# - The node must not log two_factor_code.
+# - The code is used only for this request.
+
+string owner_address
+string two_factor_code
+---
+bool success
+string error_code
+string error

@@ -1,0 +1,18 @@
+# Read a single peaqOS DID precompile attribute.
+#
+# signer_address selects any locally stored EVM wallet for RPC client setup. If
+# empty, the node uses its configured default machine address.
+# did_address accepts either a 0x EVM address or did:peaq:<0x-address>.
+
+string signer_address
+string did_address
+string name
+---
+string attribute_name
+string value
+uint64 validity
+uint64 created
+bool success
+string error_code
+string error_field
+string error

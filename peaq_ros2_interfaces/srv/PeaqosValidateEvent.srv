@@ -1,0 +1,20 @@
+# Validate a peaqOS machine event and compute the data hash locally.
+#
+# raw_data_hex and metadata_hex are 0x-prefixed byte strings. Empty raw_data_hex
+# means "no raw data" and produces bytes32(0) as the on-chain data hash.
+
+uint64 machine_id
+uint8 event_type
+uint64 value
+uint64 timestamp
+string raw_data_hex
+uint8 trust_level
+uint64 source_chain_id
+string source_tx_hash
+string metadata_hex
+---
+string data_hash
+bool success
+string error_code
+string error_field
+string error

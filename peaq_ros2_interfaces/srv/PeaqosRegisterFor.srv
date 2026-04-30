@@ -1,0 +1,12 @@
+# Register a machine EVM address through a locally managed proxy/operator wallet.
+#
+# proxy_address selects the local signer. If empty, the node uses its configured
+# default proxy address.
+
+string proxy_address
+string machine_address
+---
+uint64 machine_id
+bool success
+string error_code
+string error

@@ -1,0 +1,14 @@
+# Start peaqOS gas-station 2FA setup for an owner/operator address.
+#
+# The QR image URL is short-lived and should not be persisted.
+
+string owner_address
+# "svg" or "png"; empty defaults to node config.
+string qr_format
+---
+string owner_address
+string otpauth_uri
+string qr_image_url
+bool success
+string error_code
+string error

@@ -1,0 +1,16 @@
+# Submit multiple peaqOS machine events atomically through the Batch precompile.
+#
+# signer_address selects a locally stored EVM wallet. If empty, the node uses
+# its configured default machine address.
+# events_json must be a JSON array of event objects with keys matching
+# PeaqosSubmitEvent request fields except signer_address. raw_data_hex and
+# metadata_hex are accepted for byte fields.
+
+string signer_address
+string events_json
+---
+string tx_hashes_json
+bool success
+string error_code
+string error_field
+string error

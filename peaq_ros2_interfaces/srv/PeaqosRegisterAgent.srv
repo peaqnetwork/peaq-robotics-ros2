@@ -1,0 +1,11 @@
+# Register a locally managed machine wallet with peaqOS IdentityRegistry.
+#
+# address selects a locally stored EVM wallet. If empty, the node uses its
+# configured default machine address.
+
+string address
+---
+uint64 machine_id
+bool success
+string error_code
+string error

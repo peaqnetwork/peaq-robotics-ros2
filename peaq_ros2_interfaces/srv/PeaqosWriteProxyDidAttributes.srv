@@ -1,0 +1,14 @@
+# Atomically write the 2 standard DID attributes for a proxy/operator DID.
+#
+# signer_address selects the local EVM wallet whose DID receives the attributes.
+# If empty, the node uses its configured default proxy address.
+
+string signer_address
+uint64 proxy_agent_id
+uint64[] machine_ids
+---
+string tx_hash
+bool success
+string error_code
+string error_field
+string error

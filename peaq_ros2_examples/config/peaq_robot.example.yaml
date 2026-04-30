@@ -44,11 +44,64 @@ wallet:
   # Option 4: Provide private key directly (NOT recommended for production)
   # private_key_hex: "0x1234567890abcdef..."
 
+# =============================================================================
+# PEAQOS MACHINE ONBOARDING + EVENTS (EVM)
+# =============================================================================
+#
+# This config is consumed by `peaq_ros2_peaqos`.
+#
+# Security notes:
+# - Wallet private keys stay in one local registry file on the robot.
+# - Private keys are never accepted or returned over ROS services.
+# - TOTP codes are request-only and must not be logged.
+#
+peaq_os:
+  enabled: false
+
+  # peaq EVM JSON-RPC endpoint used by peaq-os-sdk.
+  rpc_url: "https://quicknode1.peaq.xyz"
+
+  # Hosted peaqOS MCR API. Override with http://127.0.0.1:8000 when running
+  # peaq-os-mcr-core locally via Docker.
+  api_url: "https://mcr.peaq.xyz"
+
+  faucet:
+    base_url: "https://depinstation.peaq.network"
+    qr_format: "svg"
+
+  wallet_registry:
+    path: "~/.peaq_robot/peaqos_wallets.json"
+
+  defaults:
+    # Optional fallbacks used when request fields are empty.
+    owner_address: ""
+    machine_address: ""
+    proxy_address: ""
+
+  contracts:
+    # Current peaq mainnet proxy addresses from the peaqOS contract docs.
+    identity_registry: "0xb53Af985765031936311273599389b5B68aC9956"
+    identity_staking: "0x11c05A650704136786253e8685f56879A202b1C7"
+    event_registry: "0x43c6c12eecAf4fB3F164375A9c44f8a6Efc139b9"
+    machine_nft: "0x2943F80e9DdB11B9Dd275499C661Df78F5F691F9"
+    did_registry: "0x0000000000000000000000000000000000000800"
+    batch_precompile: "0x0000000000000000000000000000000000000805"
+
+    # Feature-scoped: required only for smart-account and peaq-to-Base bridge calls.
+    machine_account_factory: "0x4A808d5A90A2c91739E92C70aF19924e0B3D527f"
+    machine_nft_adapter: "0x9AD5408702EC204441A88589B99ADfC2514AFAE6"
+
+  operational_limits:
+    # All zeros disable SDK-side event limits.
+    max_value_per_tx: 0
+    rate_limit_max_events: 0
+    rate_limit_window_seconds: 0
+
 # Logging configuration (shared by all nodes)
 logging:
   # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
   level: INFO
-  
+
   # Log format: human (readable), json (structured)
   format: human
 
@@ -250,4 +303,3 @@ humanoids:
 # logging:
 #   level: DEBUG
 #   format: json
-

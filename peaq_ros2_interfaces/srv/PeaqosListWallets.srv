@@ -1,0 +1,11 @@
+# List locally managed peaqOS wallet public metadata.
+#
+# Security:
+# - Private keys are never returned through ROS services.
+# - Response is a JSON array of public metadata:
+#   {address, label, created_at, account_id, chain_id, network}.
+
+---
+string wallets_json
+bool success
+string error

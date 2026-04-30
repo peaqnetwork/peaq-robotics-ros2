@@ -1,0 +1,9 @@
+# Query Machine Credit Rating (MCR) by machine DID.
+
+string did
+---
+string result_json
+bool success
+string error_code
+string error_field
+string error

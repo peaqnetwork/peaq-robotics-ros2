@@ -1,0 +1,11 @@
+# Create a local EVM wallet for peaqOS machine onboarding.
+#
+# Security:
+# - The private key is stored only in the node-local wallet registry.
+# - Private keys are never returned through ROS services.
+
+string label
+---
+string address
+bool success
+string error
