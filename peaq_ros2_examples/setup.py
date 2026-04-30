@@ -18,11 +18,13 @@ script_files = [
     os.path.join('scripts', 'emit_intent.py'),
     os.path.join('scripts', 'send_store_add_data.py'),
     os.path.join('scripts', 'e2e_real_test.py'),
+    os.path.join('scripts', 'peaqos_demo.py'),
 ]
 
 setup(
     name=package_name,
     version='1.0.0',
+    tests_require=['pytest'],
     packages=[package_name, package_name + '.scripts'],
     data_files=[
         ('share/ament_index/resource_index/packages', [os.path.join('resource', package_name)]),
@@ -42,5 +44,3 @@ setup(
         ],
     },
 )
-
-

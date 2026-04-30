@@ -1,0 +1,15 @@
+# Mint a Machine NFT for a registered machine.
+#
+# signer_address selects a locally stored EVM wallet. If empty, the node uses
+# its configured default proxy address, falling back to default machine address.
+# recipient may be empty to use the signer address.
+
+string signer_address
+uint64 machine_id
+string recipient
+---
+string tx_hash
+bool success
+string error_code
+string error_field
+string error

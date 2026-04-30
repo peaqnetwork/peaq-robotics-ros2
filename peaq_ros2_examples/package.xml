@@ -14,6 +14,9 @@
   <exec_depend>peaq_ros2_interfaces</exec_depend>
   <exec_depend>peaq_ros2_core</exec_depend>
   <exec_depend>peaq_ros2_humanoids</exec_depend>
+  <exec_depend>peaq_ros2_peaqos</exec_depend>
+
+  <test_depend>pytest</test_depend>
 
   <export>
     <build_type>ament_python</build_type>

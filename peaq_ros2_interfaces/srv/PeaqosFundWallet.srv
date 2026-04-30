@@ -1,0 +1,21 @@
+# Request gas-station funding for a machine EVM wallet.
+#
+# request_id is the idempotency key. If empty, the node generates and persists one
+# in the response so callers can safely retry the same logical operation.
+
+string owner_address
+string target_address
+string chain_id
+string two_factor_code
+string request_id
+---
+# "success" or "skipped" on successful faucet responses.
+string status
+string request_id
+string tx_hash
+string funded_amount
+string current_balance
+string min_gas_balance
+bool success
+string error_code
+string error

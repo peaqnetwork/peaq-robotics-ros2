@@ -1,0 +1,9 @@
+# Query all machines managed by an operator DID.
+
+string did
+---
+string result_json
+bool success
+string error_code
+string error_field
+string error

@@ -1,0 +1,11 @@
+# Delete one locally managed peaqOS wallet from the local registry.
+#
+# Security:
+# - This removes local signing material from the robot.
+# - Private keys are never accepted or returned through ROS services.
+
+string address
+---
+bool deleted
+bool success
+string error

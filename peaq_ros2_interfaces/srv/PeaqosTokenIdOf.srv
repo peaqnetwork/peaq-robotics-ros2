@@ -1,0 +1,14 @@
+# Query the Machine NFT token ID assigned to a registered machine.
+#
+# signer_address selects a locally stored EVM wallet used to configure SDK
+# access. If empty, the node uses its configured default proxy address,
+# falling back to default machine address.
+
+string signer_address
+uint64 machine_id
+---
+uint64 token_id
+bool success
+string error_code
+string error_field
+string error

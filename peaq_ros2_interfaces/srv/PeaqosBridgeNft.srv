@@ -1,0 +1,21 @@
+# Bridge a Machine NFT between peaq and Base via LayerZero v2.
+#
+# signer_address selects a locally stored EVM wallet. If empty, the node uses
+# its configured default proxy address.
+# base_rpc_url and base_nft_address are required only when source is "base".
+# options_hex is raw LayerZero extraOptions bytes; empty uses contract defaults.
+
+string signer_address
+uint64 token_id
+string source
+string destination
+string recipient
+string base_rpc_url
+string base_nft_address
+string options_hex
+---
+string tx_hash
+bool success
+string error_code
+string error_field
+string error

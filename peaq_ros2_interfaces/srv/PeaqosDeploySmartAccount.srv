@@ -1,0 +1,18 @@
+# Deploy an ERC-4337 smart account via MachineAccountFactory.
+#
+# signer_address selects a locally stored EVM wallet. If empty, the node uses
+# its configured default proxy address.
+# daily_limit is kept for backward compatibility and ignored by current
+# MachineAccountFactory contract call. salt is a uint256 string.
+
+string signer_address
+string owner
+string machine
+string daily_limit
+string salt
+---
+string address
+bool success
+string error_code
+string error_field
+string error

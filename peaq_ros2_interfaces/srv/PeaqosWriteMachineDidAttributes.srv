@@ -1,0 +1,18 @@
+# Atomically write the 6 standard DID attributes for a registered machine.
+#
+# signer_address selects the local EVM wallet whose DID receives the attributes.
+# If empty, the node uses its configured default machine address.
+
+string signer_address
+uint64 machine_id
+uint64 nft_token_id
+string operator_did
+string documentation_url
+string data_api
+string data_visibility
+---
+string tx_hash
+bool success
+string error_code
+string error_field
+string error

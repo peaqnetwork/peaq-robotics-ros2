@@ -1,0 +1,14 @@
+# Wait for a bridged Machine NFT to appear on the destination chain.
+#
+# timeout must be greater than 60 seconds; use 0 for the SDK default.
+
+string dst_rpc_url
+string dst_nft_address
+uint64 token_id
+uint64 timeout
+---
+bool arrived
+bool success
+string error_code
+string error_field
+string error
