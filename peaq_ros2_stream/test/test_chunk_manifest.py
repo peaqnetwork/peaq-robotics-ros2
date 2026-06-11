@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 from nacl.public import PrivateKey, SealedBox
 from nacl.signing import SigningKey, VerifyKey
 
@@ -50,7 +52,8 @@ def test_chunk_encryption_and_buyer_key_wrapping_round_trip():
     encrypted = encrypt_chunk_payload(payload, key=key, nonce=nonce)
 
     assert encrypted.plaintext_hash.startswith('sha256:')
-    assert encrypted.encrypted_data_hash.startswith('sha256:')
+    assert encrypted.encrypted_data_hash == 'sha256:' + hashlib.sha256(encrypted.ciphertext_bytes).hexdigest()
+    assert encrypted.key_commitment == 'sha256:' + hashlib.sha256(key).hexdigest()
     assert decrypt_chunk_payload(encrypted.ciphertext_bytes, key, nonce) == encrypted.plaintext_bytes
 
     buyer_private = PrivateKey.generate()

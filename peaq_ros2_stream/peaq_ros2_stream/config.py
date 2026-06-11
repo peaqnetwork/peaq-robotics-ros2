@@ -7,15 +7,21 @@ from typing import Any, Mapping
 
 from .models import (
     FIELD_ACTIONS,
+    GoogleDriveStorageConfig,
     KEY_RECIPIENT_TYPES,
     QOS_PRESETS,
+    STORAGE_BACKENDS,
     BufferConfig,
+    DeliveryConfig,
     FieldRule,
     KeyRecipientConfig,
     PayloadConfig,
     PeaqosEventConfig,
+    S3StorageConfig,
+    StorageConfig,
     StreamAgentConfig,
     TopicRule,
+    WalrusStorageConfig,
 )
 
 try:
@@ -43,6 +49,15 @@ def _as_int(value: Any, current: int) -> int:
         return current
     try:
         return int(value)
+    except Exception:
+        return current
+
+
+def _as_float(value: Any, current: float) -> float:
+    if value is None or value == '':
+        return current
+    try:
+        return float(value)
     except Exception:
         return current
 
@@ -140,6 +155,14 @@ def _merge_stream_data(cfg: dict[str, Any], data: Mapping[str, Any]) -> None:
         stream.get('chunk_manifest_path') or stream.get('chunkManifestPath'),
         cfg['chunk_manifest_path'],
     )
+    cfg['chunk_catalog_path'] = _as_str(
+        stream.get('chunk_catalog_path') or stream.get('chunkCatalogPath'),
+        cfg['chunk_catalog_path'],
+    )
+    cfg['chunk_key_store_path'] = _as_str(
+        stream.get('chunk_key_store_path') or stream.get('chunkKeyStorePath'),
+        cfg['chunk_key_store_path'],
+    )
     cfg['heartbeat_interval_seconds'] = max(
         5,
         _as_int(
@@ -209,6 +232,88 @@ def _merge_stream_data(cfg: dict[str, Any], data: Mapping[str, Any]) -> None:
             camel = ''.join([key.split('_')[0], *[part.capitalize() for part in key.split('_')[1:]]])
             cfg['peaqos_event'][key] = _as_int(event_data.get(key) or event_data.get(camel), cfg['peaqos_event'][key])
 
+    storage_data = stream.get('storage', {}) or {}
+    if isinstance(storage_data, Mapping):
+        backend = _as_str(storage_data.get('backend'), cfg['storage']['backend']).lower()
+        cfg['storage']['backend'] = backend if backend in STORAGE_BACKENDS else cfg['storage']['backend']
+        walrus_data = storage_data.get('walrus', {}) or {}
+        if isinstance(walrus_data, Mapping):
+            cfg['storage']['walrus']['publisher_url'] = _as_str(
+                walrus_data.get('publisher_url') or walrus_data.get('publisherUrl'),
+                cfg['storage']['walrus']['publisher_url'],
+            )
+            cfg['storage']['walrus']['aggregator_url'] = _as_str(
+                walrus_data.get('aggregator_url') or walrus_data.get('aggregatorUrl'),
+                cfg['storage']['walrus']['aggregator_url'],
+            )
+            cfg['storage']['walrus']['publisher_token'] = _as_str(
+                walrus_data.get('publisher_token') or walrus_data.get('publisherToken'),
+                cfg['storage']['walrus']['publisher_token'],
+            )
+            cfg['storage']['walrus']['epochs'] = max(
+                1,
+                _as_int(walrus_data.get('epochs'), cfg['storage']['walrus']['epochs']),
+            )
+            cfg['storage']['walrus']['permanent'] = _as_bool(
+                walrus_data.get('permanent'),
+                cfg['storage']['walrus']['permanent'],
+            )
+            cfg['storage']['walrus']['timeout_sec'] = max(
+                1.0,
+                _as_float(
+                    walrus_data.get('timeout_sec') or walrus_data.get('timeoutSec'),
+                    cfg['storage']['walrus']['timeout_sec'],
+                ),
+            )
+        s3_data = storage_data.get('s3', {}) or {}
+        if isinstance(s3_data, Mapping):
+            cfg['storage']['s3']['bucket'] = _as_str(s3_data.get('bucket'), cfg['storage']['s3']['bucket'])
+            cfg['storage']['s3']['prefix'] = _as_str(s3_data.get('prefix'), cfg['storage']['s3']['prefix'])
+            cfg['storage']['s3']['endpoint_url'] = _as_str(
+                s3_data.get('endpoint_url') or s3_data.get('endpointUrl'),
+                cfg['storage']['s3']['endpoint_url'],
+            )
+            cfg['storage']['s3']['region'] = _as_str(
+                s3_data.get('region') or s3_data.get('region_name') or s3_data.get('regionName'),
+                cfg['storage']['s3']['region'],
+            )
+            cfg['storage']['s3']['access_key_id'] = _as_str(
+                s3_data.get('access_key_id') or s3_data.get('accessKeyId'),
+                cfg['storage']['s3']['access_key_id'],
+            )
+            cfg['storage']['s3']['secret_access_key'] = _as_str(
+                s3_data.get('secret_access_key') or s3_data.get('secretAccessKey'),
+                cfg['storage']['s3']['secret_access_key'],
+            )
+            cfg['storage']['s3']['session_token'] = _as_str(
+                s3_data.get('session_token') or s3_data.get('sessionToken'),
+                cfg['storage']['s3']['session_token'],
+            )
+        drive_data = storage_data.get('google_drive') or storage_data.get('googleDrive') or storage_data.get('google-drive') or {}
+        if isinstance(drive_data, Mapping):
+            cfg['storage']['google_drive']['folder_id'] = _as_str(
+                drive_data.get('folder_id') or drive_data.get('folderId'),
+                cfg['storage']['google_drive']['folder_id'],
+            )
+            cfg['storage']['google_drive']['credentials_path'] = _as_str(
+                drive_data.get('credentials_path') or drive_data.get('credentialsPath'),
+                cfg['storage']['google_drive']['credentials_path'],
+            )
+
+    delivery_data = stream.get('delivery', {}) or {}
+    if isinstance(delivery_data, Mapping):
+        cfg['delivery']['enabled'] = _as_bool(delivery_data.get('enabled'), cfg['delivery']['enabled'])
+        cfg['delivery']['host'] = _as_str(delivery_data.get('host'), cfg['delivery']['host'])
+        cfg['delivery']['port'] = max(1, _as_int(delivery_data.get('port'), cfg['delivery']['port']))
+        cfg['delivery']['token'] = _as_str(delivery_data.get('token'), cfg['delivery']['token'])
+        cfg['delivery']['poll_interval_seconds'] = max(
+            1,
+            _as_int(
+                delivery_data.get('poll_interval_seconds') or delivery_data.get('pollIntervalSeconds'),
+                cfg['delivery']['poll_interval_seconds'],
+            ),
+        )
+
 def _apply_policy_file(cfg: dict[str, Any]) -> None:
     policy_path = cfg.get('policy_path', '')
     if not policy_path:
@@ -237,7 +342,82 @@ def _apply_env(cfg: dict[str, Any]) -> None:
     cfg['signing_key_path'] = _as_str(os.getenv('PEAQOS_STREAM_SIGNING_KEY_PATH'), cfg['signing_key_path'])
     cfg['chunk_storage_path'] = _as_str(os.getenv('PEAQOS_STREAM_CHUNK_STORAGE_PATH'), cfg['chunk_storage_path'])
     cfg['chunk_manifest_path'] = _as_str(os.getenv('PEAQOS_STREAM_CHUNK_MANIFEST_PATH'), cfg['chunk_manifest_path'])
+    cfg['chunk_catalog_path'] = _as_str(os.getenv('PEAQOS_STREAM_CHUNK_CATALOG_PATH'), cfg['chunk_catalog_path'])
+    cfg['chunk_key_store_path'] = _as_str(os.getenv('PEAQOS_STREAM_CHUNK_KEY_STORE_PATH'), cfg['chunk_key_store_path'])
     cfg['buffer']['path'] = _as_str(os.getenv('PEAQOS_STREAM_BUFFER_PATH'), cfg['buffer']['path'])
+    storage_backend = _as_str(os.getenv('PEAQOS_STREAM_STORAGE_BACKEND'), cfg['storage']['backend']).lower()
+    cfg['storage']['backend'] = storage_backend if storage_backend in STORAGE_BACKENDS else cfg['storage']['backend']
+    cfg['storage']['walrus']['publisher_url'] = _as_str(
+        os.getenv('PEAQOS_STREAM_WALRUS_PUBLISHER_URL') or os.getenv('WALRUS_PUBLISHER_URL'),
+        cfg['storage']['walrus']['publisher_url'],
+    )
+    cfg['storage']['walrus']['aggregator_url'] = _as_str(
+        os.getenv('PEAQOS_STREAM_WALRUS_AGGREGATOR_URL') or os.getenv('WALRUS_AGGREGATOR_URL'),
+        cfg['storage']['walrus']['aggregator_url'],
+    )
+    cfg['storage']['walrus']['publisher_token'] = _as_str(
+        os.getenv('PEAQOS_STREAM_WALRUS_PUBLISHER_TOKEN') or os.getenv('WALRUS_PUBLISHER_TOKEN'),
+        cfg['storage']['walrus']['publisher_token'],
+    )
+    cfg['storage']['walrus']['epochs'] = max(
+        1,
+        _as_int(os.getenv('PEAQOS_STREAM_WALRUS_EPOCHS'), cfg['storage']['walrus']['epochs']),
+    )
+    cfg['storage']['walrus']['permanent'] = _as_bool(
+        os.getenv('PEAQOS_STREAM_WALRUS_PERMANENT'),
+        cfg['storage']['walrus']['permanent'],
+    )
+    cfg['storage']['walrus']['timeout_sec'] = max(
+        1.0,
+        _as_float(os.getenv('PEAQOS_STREAM_WALRUS_TIMEOUT_SEC'), cfg['storage']['walrus']['timeout_sec']),
+    )
+    cfg['storage']['s3']['bucket'] = _as_str(
+        os.getenv('PEAQOS_STREAM_S3_BUCKET') or os.getenv('AWS_S3_BUCKET'),
+        cfg['storage']['s3']['bucket'],
+    )
+    cfg['storage']['s3']['prefix'] = _as_str(
+        os.getenv('PEAQOS_STREAM_S3_PREFIX'),
+        cfg['storage']['s3']['prefix'],
+    )
+    cfg['storage']['s3']['endpoint_url'] = _as_str(
+        os.getenv('PEAQOS_STREAM_S3_ENDPOINT_URL') or os.getenv('AWS_ENDPOINT_URL_S3') or os.getenv('AWS_ENDPOINT_URL'),
+        cfg['storage']['s3']['endpoint_url'],
+    )
+    cfg['storage']['s3']['region'] = _as_str(
+        os.getenv('PEAQOS_STREAM_S3_REGION') or os.getenv('AWS_REGION') or os.getenv('AWS_DEFAULT_REGION'),
+        cfg['storage']['s3']['region'],
+    )
+    cfg['storage']['s3']['access_key_id'] = _as_str(
+        os.getenv('PEAQOS_STREAM_S3_ACCESS_KEY_ID') or os.getenv('AWS_ACCESS_KEY_ID'),
+        cfg['storage']['s3']['access_key_id'],
+    )
+    cfg['storage']['s3']['secret_access_key'] = _as_str(
+        os.getenv('PEAQOS_STREAM_S3_SECRET_ACCESS_KEY') or os.getenv('AWS_SECRET_ACCESS_KEY'),
+        cfg['storage']['s3']['secret_access_key'],
+    )
+    cfg['storage']['s3']['session_token'] = _as_str(
+        os.getenv('PEAQOS_STREAM_S3_SESSION_TOKEN') or os.getenv('AWS_SESSION_TOKEN'),
+        cfg['storage']['s3']['session_token'],
+    )
+    cfg['storage']['google_drive']['folder_id'] = _as_str(
+        os.getenv('PEAQOS_STREAM_GOOGLE_DRIVE_FOLDER_ID') or os.getenv('GOOGLE_DRIVE_FOLDER_ID'),
+        cfg['storage']['google_drive']['folder_id'],
+    )
+    cfg['storage']['google_drive']['credentials_path'] = _as_str(
+        os.getenv('PEAQOS_STREAM_GOOGLE_DRIVE_CREDENTIALS_PATH') or os.getenv('GOOGLE_APPLICATION_CREDENTIALS'),
+        cfg['storage']['google_drive']['credentials_path'],
+    )
+    cfg['delivery']['enabled'] = _as_bool(os.getenv('PEAQOS_STREAM_DELIVERY_ENABLED'), cfg['delivery']['enabled'])
+    cfg['delivery']['host'] = _as_str(os.getenv('PEAQOS_STREAM_DELIVERY_HOST'), cfg['delivery']['host'])
+    cfg['delivery']['port'] = max(
+        1,
+        _as_int(os.getenv('PEAQOS_STREAM_DELIVERY_PORT'), cfg['delivery']['port']),
+    )
+    cfg['delivery']['token'] = _as_str(os.getenv('PEAQOS_STREAM_DELIVERY_TOKEN'), cfg['delivery']['token'])
+    cfg['delivery']['poll_interval_seconds'] = max(
+        1,
+        _as_int(os.getenv('PEAQOS_STREAM_DELIVERY_POLL_INTERVAL_SECONDS'), cfg['delivery']['poll_interval_seconds']),
+    )
     owner_id = _as_str(os.getenv('PEAQOS_STREAM_OWNER_ID'), '')
     owner_public_key_hex = _as_str(os.getenv('PEAQOS_STREAM_OWNER_PUBLIC_KEY_HEX'), '').removeprefix('0x').lower()
     if owner_id and owner_public_key_hex:
@@ -263,14 +443,33 @@ def _apply_params(cfg: dict[str, Any], params: Mapping[str, Any]) -> None:
         'stream_agent.sequence_state_path': ('sequence_state_path', _as_str),
         'stream_agent.chunk_storage_path': ('chunk_storage_path', _as_str),
         'stream_agent.chunk_manifest_path': ('chunk_manifest_path', _as_str),
+        'stream_agent.chunk_catalog_path': ('chunk_catalog_path', _as_str),
+        'stream_agent.chunk_key_store_path': ('chunk_key_store_path', _as_str),
+        'stream_agent.storage_backend': ('storage.backend', _as_str),
+        'stream_agent.s3_bucket': ('storage.s3.bucket', _as_str),
+        'stream_agent.s3_prefix': ('storage.s3.prefix', _as_str),
+        'stream_agent.s3_endpoint_url': ('storage.s3.endpoint_url', _as_str),
+        'stream_agent.s3_region': ('storage.s3.region', _as_str),
+        'stream_agent.google_drive_folder_id': ('storage.google_drive.folder_id', _as_str),
+        'stream_agent.google_drive_credentials_path': ('storage.google_drive.credentials_path', _as_str),
+        'stream_agent.delivery_enabled': ('delivery.enabled', _as_bool),
+        'stream_agent.delivery_host': ('delivery.host', _as_str),
+        'stream_agent.delivery_port': ('delivery.port', _as_int),
+        'stream_agent.delivery_token': ('delivery.token', _as_str),
+        'stream_agent.delivery_poll_interval_seconds': ('delivery.poll_interval_seconds', _as_int),
     }
     for param_key, (cfg_key, caster) in mapping.items():
         if param_key in params:
             if '.' in cfg_key:
-                section, key = cfg_key.split('.', 1)
-                cfg[section][key] = caster(params[param_key], cfg[section][key])
+                keys = cfg_key.split('.')
+                target = cfg
+                for key in keys[:-1]:
+                    target = target[key]
+                target[keys[-1]] = caster(params[param_key], target[keys[-1]])
             else:
                 cfg[cfg_key] = caster(params[param_key], cfg[cfg_key])
+    backend = str(cfg['storage']['backend']).strip().lower()
+    cfg['storage']['backend'] = backend if backend in STORAGE_BACKENDS else 'local'
 
 
 def _default_config_dict() -> dict[str, Any]:
@@ -288,6 +487,8 @@ def _default_config_dict() -> dict[str, Any]:
         'sequence_state_path': '~/.peaq_robot/stream_sequences.json',
         'chunk_storage_path': '~/.peaq_robot/stream_chunks',
         'chunk_manifest_path': '~/.peaq_robot/stream_manifests/chunks.json',
+        'chunk_catalog_path': '~/.peaq_robot/stream_catalog.sqlite3',
+        'chunk_key_store_path': '~/.peaq_robot/stream_chunk_keys.sqlite3',
         'heartbeat_interval_seconds': 60,
         'topics': [],
         'destinations': ['backend'],
@@ -313,6 +514,37 @@ def _default_config_dict() -> dict[str, Any]:
             'service_wait_sec': 2.0,
             'timeout_sec': 30.0,
         },
+        'storage': {
+            'backend': 'local',
+            'walrus': {
+                'publisher_url': '',
+                'aggregator_url': '',
+                'publisher_token': '',
+                'epochs': 5,
+                'permanent': True,
+                'timeout_sec': 30.0,
+            },
+            's3': {
+                'bucket': '',
+                'prefix': 'peaq-stream',
+                'endpoint_url': '',
+                'region': '',
+                'access_key_id': '',
+                'secret_access_key': '',
+                'session_token': '',
+            },
+            'google_drive': {
+                'folder_id': '',
+                'credentials_path': '',
+            },
+        },
+        'delivery': {
+            'enabled': False,
+            'host': '127.0.0.1',
+            'port': 8765,
+            'token': '',
+            'poll_interval_seconds': 15,
+        },
     }
 
 
@@ -329,6 +561,8 @@ def _build_config(cfg: dict[str, Any]) -> StreamAgentConfig:
             raise ValueError(f'stream_agent missing required fields: {", ".join(missing)}')
         if not topics:
             raise ValueError('stream_agent requires at least one topic when enabled')
+    if cfg['delivery']['enabled'] and not str(cfg['delivery']['token']).strip():
+        raise ValueError('stream_agent delivery requires token when enabled')
 
     return StreamAgentConfig(
         enabled=bool(cfg['enabled']),
@@ -344,12 +578,21 @@ def _build_config(cfg: dict[str, Any]) -> StreamAgentConfig:
         sequence_state_path=str(cfg['sequence_state_path']),
         chunk_storage_path=str(cfg['chunk_storage_path']),
         chunk_manifest_path=str(cfg['chunk_manifest_path']),
+        chunk_catalog_path=str(cfg['chunk_catalog_path']),
+        chunk_key_store_path=str(cfg['chunk_key_store_path']),
         heartbeat_interval_seconds=int(cfg['heartbeat_interval_seconds']),
         topics=topics,
         destinations=tuple(_as_list(cfg['destinations']) or ['backend']),
         buffer=BufferConfig(**cfg['buffer']),
         payload=PayloadConfig(**cfg['payload']),
         peaqos_event=PeaqosEventConfig(**cfg['peaqos_event']),
+        storage=StorageConfig(
+            backend=str(cfg['storage']['backend']),
+            walrus=WalrusStorageConfig(**cfg['storage']['walrus']),
+            s3=S3StorageConfig(**cfg['storage']['s3']),
+            google_drive=GoogleDriveStorageConfig(**cfg['storage']['google_drive']),
+        ),
+        delivery=DeliveryConfig(**cfg['delivery']),
         key_recipients=key_recipients,
     )
 

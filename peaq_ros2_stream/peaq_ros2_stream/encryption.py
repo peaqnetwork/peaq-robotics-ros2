@@ -9,7 +9,7 @@ from nacl.public import PublicKey, SealedBox
 from nacl.secret import Aead
 from nacl.utils import random
 
-from .transform import payload_hash, stable_json
+from .transform import byte_hash, payload_hash, stable_json
 
 
 ALGORITHM = 'xchacha20-poly1305'
@@ -47,8 +47,8 @@ def encrypt_chunk_payload(payload: Any, key: bytes | None = None, nonce: bytes |
         key_hex=key_bytes.hex(),
         nonce_hex=nonce_bytes.hex(),
         plaintext_hash=payload_hash(payload),
-        encrypted_data_hash=payload_hash(ciphertext.hex()),
-        key_commitment=payload_hash(key_bytes.hex()),
+        encrypted_data_hash=byte_hash(ciphertext),
+        key_commitment=byte_hash(key_bytes),
     )
 
 

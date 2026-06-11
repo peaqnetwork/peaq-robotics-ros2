@@ -10,6 +10,7 @@ from typing import Any
 FIELD_ACTIONS = {'include', 'exclude', 'encrypt', 'anonymize', 'hash'}
 QOS_PRESETS = {'default', 'sensor_data', 'reliable'}
 KEY_RECIPIENT_TYPES = {'machine', 'owner', 'operator'}
+STORAGE_BACKENDS = {'local', 'walrus', 's3', 'google-drive'}
 
 
 def _expand(path: str) -> str:
@@ -95,6 +96,50 @@ class PeaqosEventConfig:
 
 
 @dataclass(frozen=True)
+class WalrusStorageConfig:
+    publisher_url: str = ''
+    aggregator_url: str = ''
+    publisher_token: str = ''
+    epochs: int = 5
+    permanent: bool = True
+    timeout_sec: float = 30.0
+
+
+@dataclass(frozen=True)
+class S3StorageConfig:
+    bucket: str = ''
+    prefix: str = 'peaq-stream'
+    endpoint_url: str = ''
+    region: str = ''
+    access_key_id: str = ''
+    secret_access_key: str = ''
+    session_token: str = ''
+
+
+@dataclass(frozen=True)
+class GoogleDriveStorageConfig:
+    folder_id: str = ''
+    credentials_path: str = ''
+
+
+@dataclass(frozen=True)
+class StorageConfig:
+    backend: str = 'local'
+    walrus: WalrusStorageConfig = field(default_factory=WalrusStorageConfig)
+    s3: S3StorageConfig = field(default_factory=S3StorageConfig)
+    google_drive: GoogleDriveStorageConfig = field(default_factory=GoogleDriveStorageConfig)
+
+
+@dataclass(frozen=True)
+class DeliveryConfig:
+    enabled: bool = False
+    host: str = '127.0.0.1'
+    port: int = 8765
+    token: str = ''
+    poll_interval_seconds: int = 15
+
+
+@dataclass(frozen=True)
 class KeyRecipientConfig:
     recipient_id: str
     recipient_type: str
@@ -125,12 +170,16 @@ class StreamAgentConfig:
     sequence_state_path: str = '~/.peaq_robot/stream_sequences.json'
     chunk_storage_path: str = '~/.peaq_robot/stream_chunks'
     chunk_manifest_path: str = '~/.peaq_robot/stream_manifests/chunks.json'
+    chunk_catalog_path: str = '~/.peaq_robot/stream_catalog.sqlite3'
+    chunk_key_store_path: str = '~/.peaq_robot/stream_chunk_keys.sqlite3'
     heartbeat_interval_seconds: int = 60
     topics: tuple[TopicRule, ...] = field(default_factory=tuple)
     destinations: tuple[str, ...] = ('backend',)
     buffer: BufferConfig = field(default_factory=BufferConfig)
     payload: PayloadConfig = field(default_factory=PayloadConfig)
     peaqos_event: PeaqosEventConfig = field(default_factory=PeaqosEventConfig)
+    storage: StorageConfig = field(default_factory=StorageConfig)
+    delivery: DeliveryConfig = field(default_factory=DeliveryConfig)
     key_recipients: tuple[KeyRecipientConfig, ...] = field(default_factory=tuple)
 
     @property
@@ -148,6 +197,14 @@ class StreamAgentConfig:
     @property
     def expanded_chunk_manifest_path(self) -> str:
         return _expand(self.chunk_manifest_path)
+
+    @property
+    def expanded_chunk_catalog_path(self) -> str:
+        return _expand(self.chunk_catalog_path)
+
+    @property
+    def expanded_chunk_key_store_path(self) -> str:
+        return _expand(self.chunk_key_store_path)
 
     def policy_payload(self) -> dict[str, Any]:
         return {

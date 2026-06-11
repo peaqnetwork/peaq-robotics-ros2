@@ -38,6 +38,10 @@ def payload_hash(payload: Any) -> str:
     return 'sha256:' + hashlib.sha256(stable_json(payload).encode('utf8')).hexdigest()
 
 
+def byte_hash(payload: bytes) -> str:
+    return 'sha256:' + hashlib.sha256(payload).hexdigest()
+
+
 def canonical_message_dict(message: Any) -> Any:
     if message is None or isinstance(message, (str, int, float, bool)):
         return message

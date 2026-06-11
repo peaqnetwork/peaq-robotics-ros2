@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
 
@@ -104,16 +105,26 @@ class StreamApiClient:
             },
         )['item']
 
-    def post_chunk(self, machine_id: str, agent_id: str, agent_token: str, manifest: dict[str, Any]) -> dict[str, Any]:
+    def post_chunk(
+        self,
+        machine_id: str,
+        agent_id: str,
+        agent_token: str,
+        manifest: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            'machineId': machine_id,
+            'agentId': agent_id,
+            'agentToken': agent_token,
+            'manifest': manifest,
+        }
+        if metadata:
+            payload['metadata'] = metadata
         return self._request(
             'POST',
             '/api/v1/stream/chunks',
-            {
-                'machineId': machine_id,
-                'agentId': agent_id,
-                'agentToken': agent_token,
-                'manifest': manifest,
-            },
+            payload,
         )['item']
 
     def create_buyer_access(
@@ -135,5 +146,115 @@ class StreamApiClient:
         )['item']
 
     def list_buyer_access(self, chunk_id: str, buyer_id: str = '') -> list[dict[str, Any]]:
-        suffix = f'?buyerId={buyer_id}' if buyer_id else ''
+        suffix = f'?{urlencode({"buyerId": buyer_id})}' if buyer_id else ''
         return self._request('GET', f'/api/v1/stream/chunks/{chunk_id}/buyer-access{suffix}')['items']
+
+    def create_listing(self, machine_id: str, listing: dict[str, Any]) -> dict[str, Any]:
+        return self._request('POST', f'/api/v1/machines/{machine_id}/stream/listings', listing)['item']
+
+    def list_listings(self, machine_id: str = '', include_inactive: bool = False) -> list[dict[str, Any]]:
+        params: dict[str, str] = {}
+        if machine_id:
+            params['machineId'] = machine_id
+        if include_inactive:
+            params['includeInactive'] = 'true'
+        suffix = f'?{urlencode(params)}' if params else ''
+        return self._request('GET', f'/api/v1/stream/listings{suffix}')['items']
+
+    def create_order(
+        self,
+        listing_id: str,
+        buyer_id: str,
+        buyer_public_key_hex: str,
+        chunk_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            'listingId': listing_id,
+            'buyerId': buyer_id,
+            'buyerPublicKeyHex': buyer_public_key_hex,
+        }
+        if chunk_ids:
+            payload['chunkIds'] = chunk_ids
+        return self._request('POST', '/api/v1/stream/orders', payload)['item']
+
+    def get_order(self, order_id: str) -> dict[str, Any]:
+        return self._request('GET', f'/api/v1/stream/orders/{order_id}')['item']
+
+    def get_order_delivery(self, order_id: str, buyer_id: str) -> dict[str, Any]:
+        return self._request(
+            'GET',
+            f'/api/v1/stream/orders/{order_id}/delivery?{urlencode({"buyerId": buyer_id})}',
+        )
+
+    def list_machine_orders(self, machine_id: str) -> list[dict[str, Any]]:
+        return self._request('GET', f'/api/v1/machines/{machine_id}/stream/orders')['items']
+
+    def record_order_payment(
+        self,
+        order_id: str,
+        payment_reference: str,
+        proof: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {'paymentReference': payment_reference}
+        if proof:
+            payload['proof'] = proof
+        return self._request('POST', f'/api/v1/stream/orders/{order_id}/payment', payload)['item']
+
+    def prepare_order_access(
+        self,
+        order_id: str,
+        machine_id: str,
+        agent_id: str,
+        agent_token: str,
+        items: list[dict[str, Any]],
+        delivery: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            'machineId': machine_id,
+            'agentId': agent_id,
+            'agentToken': agent_token,
+            'items': items,
+        }
+        if delivery:
+            payload['delivery'] = delivery
+        return self._request('POST', f'/api/v1/stream/orders/{order_id}/prepare-access', payload)
+
+    def poll_delivery_sessions(
+        self,
+        machine_id: str,
+        agent_id: str,
+        agent_token: str,
+        statuses: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        return self._request(
+            'POST',
+            '/api/v1/stream/delivery-sessions/poll',
+            {
+                'machineId': machine_id,
+                'agentId': agent_id,
+                'agentToken': agent_token,
+                'statuses': statuses or ['requested'],
+            },
+        )['items']
+
+    def update_delivery_session(
+        self,
+        session_id: str,
+        machine_id: str,
+        agent_id: str,
+        agent_token: str,
+        status: str,
+        delivery_url: str = '',
+        message: str = '',
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            'machineId': machine_id,
+            'agentId': agent_id,
+            'agentToken': agent_token,
+            'status': status,
+        }
+        if delivery_url:
+            payload['deliveryUrl'] = delivery_url
+        if message:
+            payload['message'] = message
+        return self._request('PATCH', f'/api/v1/stream/delivery-sessions/{session_id}', payload)['item']
