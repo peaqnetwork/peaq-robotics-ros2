@@ -16,6 +16,23 @@ ros2 run peaq_ros2_core storage_bridge_node --ros-args \
   -p config.yaml_path:=/work/packages/ros2/peaq_ros2_examples/config/peaq_robot.yaml
 ```
 
+### Stream Seller Setup
+
+After the machine is active in peaqOS, bootstrap the Stream seller config and launch both runtime nodes:
+
+```bash
+ros2 run peaq_ros2_stream stream_bootstrap \
+  --config ~/.peaq_robot/peaq_stream.yaml \
+  --api-base-url https://api.example.com \
+  --machine-id mach_123 \
+  --storage-backend s3
+
+ros2 launch peaq_ros2_stream peaq_stream.launch.py \
+  config_yaml:=~/.peaq_robot/peaq_stream.yaml
+```
+
+If no recovery recipients are already configured, bootstrap creates a local machine X25519 key and adds its public key as a `machine` recipient for new chunks. Add owner/operator recipients with their public keys when the seller needs recovery outside the machine.
+
 ### Benefits
 
 1. **Single source of truth** - Network, wallet, and logging configured once

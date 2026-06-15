@@ -97,6 +97,92 @@ peaq_os:
     rate_limit_max_events: 0
     rate_limit_window_seconds: 0
 
+# =============================================================================
+# PEAQOS STREAM AGENT (SIGNED ROS 2 TOPIC RECEIPTS)
+# =============================================================================
+#
+# This config is consumed by `peaq_ros2_stream`.
+# Enroll a machine agent with allowedProviderKeys: ["stream"], then set the
+# returned agent id/token here. Topic data is signed with a separate local
+# Ed25519 data key and buffered locally when the API is unavailable.
+#
+stream_agent:
+  enabled: false
+  api_base_url: "http://127.0.0.1:8000"
+  api_key: ""
+  machine_id: ""
+  agent_id: ""
+  agent_token: ""
+  identity_ref: ""
+  policy_name: "ROS 2 Telemetry Stream"
+  policy_path: ""
+  signing_key_path: "~/.peaq_robot/stream_signing_key.json"
+  sequence_state_path: "~/.peaq_robot/stream_sequences.json"
+  chunk_storage_path: "~/.peaq_robot/stream_chunks"
+  chunk_manifest_path: "~/.peaq_robot/stream_manifests/chunks.json"
+  chunk_catalog_path: "~/.peaq_robot/stream_catalog.sqlite3"
+  heartbeat_interval_seconds: 60
+
+  topics:
+    - topic: "/battery"
+      message_type: "std_msgs/msg/String"
+      qos_preset: "reliable"
+      depth: 10
+      field_rules:
+        - path: "data"
+          action: "hash"
+
+  buffer:
+    path: "~/.peaq_robot/stream_buffer.sqlite3"
+    max_events: 1000
+    retention_seconds: 86400
+    retry_interval_seconds: 30
+    overflow: "drop_oldest"
+
+  payload:
+    store_inline: false
+    inline_limit_bytes: 4096
+
+  storage:
+    # local writes encrypted chunks to chunk_storage_path.
+    # walrus writes the encrypted chunk locally first, then uploads ciphertext.
+    # s3 works with AWS S3 and S3-compatible stores such as Backblaze B2.
+    backend: local
+    walrus:
+      publisher_url: ""
+      aggregator_url: ""
+      publisher_token: ""
+      epochs: 5
+      permanent: true
+      timeout_sec: 30.0
+    s3:
+      bucket: ""
+      prefix: "peaq-stream"
+      endpoint_url: ""
+      region: ""
+      access_key_id: ""
+      secret_access_key: ""
+      session_token: ""
+
+  destinations:
+    - backend
+
+  key_recipients:
+    # Optional recovery recipients. Each chunk key is wrapped to these public
+    # keys when the chunk is created, so data can still be recovered if the
+    # machine is lost.
+    # - recipient_id: "owner-did-or-wallet"
+    #   recipient_type: "owner"
+    #   public_key_hex: ""
+
+  peaqos_event:
+    enabled: false
+    node_name: "peaqos_node"
+    machine_id: 0
+    event_type: 1
+    trust_level: 0
+    source_chain_id: 0
+
 # Logging configuration (shared by all nodes)
 logging:
   # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
