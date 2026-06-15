@@ -561,6 +561,8 @@ def _build_config(cfg: dict[str, Any]) -> StreamAgentConfig:
             raise ValueError(f'stream_agent missing required fields: {", ".join(missing)}')
         if not topics:
             raise ValueError('stream_agent requires at least one topic when enabled')
+        if not key_recipients:
+            raise ValueError('stream_agent requires at least one key_recipient when enabled')
     if cfg['delivery']['enabled'] and not str(cfg['delivery']['token']).strip():
         raise ValueError('stream_agent delivery requires token when enabled')
 

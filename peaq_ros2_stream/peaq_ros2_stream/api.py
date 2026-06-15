@@ -53,6 +53,24 @@ class StreamApiClient:
     def list_policies(self, machine_id: str) -> list[dict[str, Any]]:
         return self._request('GET', f'/api/v1/machines/{machine_id}/stream/policies')['items']
 
+    def get_machine(self, machine_id: str) -> dict[str, Any]:
+        return self._request('GET', f'/api/v1/machines/{machine_id}')['item']
+
+    def enroll_machine_agent(
+        self,
+        machine_id: str,
+        label: str = 'Stream runtime',
+        allowed_provider_keys: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return self._request(
+            'POST',
+            f'/api/v1/machines/{machine_id}/agents/enrollment',
+            {
+                'label': label,
+                'allowedProviderKeys': allowed_provider_keys or ['stream'],
+            },
+        )['item']
+
     def register_signing_key(
         self,
         machine_id: str,

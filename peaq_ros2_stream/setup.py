@@ -34,6 +34,7 @@ setup(
     entry_points={
         'console_scripts': [
             'stream_agent_node = peaq_ros2_stream.stream_agent_node:main',
+            'stream_bootstrap = peaq_ros2_stream.bootstrap:main',
         ],
     },
 )

@@ -72,3 +72,23 @@ def test_stream_api_client_uses_listing_order_and_access_paths():
     assert session.calls[2]['url'] == 'https://api.example/api/v1/stream/orders/order-1/payment'
     assert session.calls[3]['url'] == 'https://api.example/api/v1/stream/orders/order-1/prepare-access'
     assert session.calls[3]['json']['delivery'] == {'mode': 'walrus'}
+
+
+def test_stream_api_client_enrolls_stream_agent_and_reads_machine():
+    session = _Session()
+    client = StreamApiClient('https://api.example')
+    client.session = session
+
+    machine = client.get_machine('machine-1')
+    agent = client.enroll_machine_agent('machine-1', label='Seller stream')
+
+    assert machine == {'id': 'created'}
+    assert agent == {'id': 'created'}
+    assert session.calls[0]['method'] == 'GET'
+    assert session.calls[0]['url'] == 'https://api.example/api/v1/machines/machine-1'
+    assert session.calls[1]['method'] == 'POST'
+    assert session.calls[1]['url'] == 'https://api.example/api/v1/machines/machine-1/agents/enrollment'
+    assert session.calls[1]['json'] == {
+        'label': 'Seller stream',
+        'allowedProviderKeys': ['stream'],
+    }

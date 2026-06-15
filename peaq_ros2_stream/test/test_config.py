@@ -120,6 +120,22 @@ def test_stream_agent_config_rejects_delivery_without_token():
         )
 
 
+def test_stream_agent_config_rejects_enabled_without_key_recipient():
+    with pytest.raises(ValueError, match='key_recipient'):
+        load_stream_agent_config_from_dict(
+            {
+                'stream_agent': {
+                    'enabled': True,
+                    'machine_id': 'mach_1',
+                    'agent_id': 'agent_1',
+                    'agent_token': 'token',
+                    'identity_ref': 'peaqos:machine:mach_1',
+                    'topics': [{'topic': '/battery', 'message_type': 'std_msgs/msg/String'}],
+                }
+            }
+        )
+
+
 def test_stream_agent_config_loads_s3_storage():
     cfg = load_stream_agent_config_from_dict(
         {
