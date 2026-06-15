@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
@@ -299,7 +300,27 @@ def read_s3_object(storage_ref: str, client: Any | None = None) -> bytes:
             import boto3  # type: ignore
         except Exception as exc:
             raise RuntimeError('boto3 is required to read S3 stream chunks') from exc
-        client = boto3.client('s3')
+        kwargs: dict[str, Any] = {}
+        endpoint_url = (
+            os.getenv('PEAQOS_STREAM_S3_ENDPOINT_URL')
+            or os.getenv('AWS_ENDPOINT_URL_S3')
+            or os.getenv('AWS_ENDPOINT_URL')
+        )
+        region = os.getenv('PEAQOS_STREAM_S3_REGION') or os.getenv('AWS_REGION') or os.getenv('AWS_DEFAULT_REGION')
+        access_key_id = os.getenv('PEAQOS_STREAM_S3_ACCESS_KEY_ID') or os.getenv('AWS_ACCESS_KEY_ID')
+        secret_access_key = os.getenv('PEAQOS_STREAM_S3_SECRET_ACCESS_KEY') or os.getenv('AWS_SECRET_ACCESS_KEY')
+        session_token = os.getenv('PEAQOS_STREAM_S3_SESSION_TOKEN') or os.getenv('AWS_SESSION_TOKEN')
+        if endpoint_url:
+            kwargs['endpoint_url'] = endpoint_url
+        if region:
+            kwargs['region_name'] = region
+        if access_key_id:
+            kwargs['aws_access_key_id'] = access_key_id
+        if secret_access_key:
+            kwargs['aws_secret_access_key'] = secret_access_key
+        if session_token:
+            kwargs['aws_session_token'] = session_token
+        client = boto3.client('s3', **kwargs)
     response = client.get_object(Bucket=bucket, Key=key)
     body = response.get('Body')
     if body is None:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 from peaq_ros2_stream.config import load_stream_agent_config_from_dict
 from peaq_ros2_stream.encryption import encrypt_chunk_payload
 from peaq_ros2_stream.storage_adapters import (
@@ -217,6 +219,40 @@ def test_read_s3_object_fetches_bytes_from_storage_ref():
 
     assert data == b's3-encrypted-bytes'
     assert client.get_calls == [{'Bucket': 'stream-bucket', 'Key': 'machine-1/chunks/1234.bin'}]
+
+
+def test_read_s3_object_uses_stream_env_for_s3_compatible_clients(monkeypatch):
+    class _Boto3:
+        def __init__(self):
+            self.calls = []
+            self.client_instance = _S3Client()
+
+        def client(self, name, **kwargs):
+            self.calls.append({'name': name, 'kwargs': kwargs})
+            return self.client_instance
+
+    fake_boto3 = _Boto3()
+    monkeypatch.setitem(sys.modules, 'boto3', fake_boto3)
+    monkeypatch.setenv('PEAQOS_STREAM_S3_ENDPOINT_URL', 'https://s3.example')
+    monkeypatch.setenv('PEAQOS_STREAM_S3_REGION', 'eu-central-1')
+    monkeypatch.setenv('PEAQOS_STREAM_S3_ACCESS_KEY_ID', 'access-key')
+    monkeypatch.setenv('PEAQOS_STREAM_S3_SECRET_ACCESS_KEY', 'secret-key')
+
+    data = read_s3_object('s3://stream-bucket/machine-1/chunks/1234.bin')
+
+    assert data == b's3-encrypted-bytes'
+    assert fake_boto3.calls == [
+        {
+            'name': 's3',
+            'kwargs': {
+                'endpoint_url': 'https://s3.example',
+                'region_name': 'eu-central-1',
+                'aws_access_key_id': 'access-key',
+                'aws_secret_access_key': 'secret-key',
+            },
+        }
+    ]
+    assert fake_boto3.client_instance.get_calls == [{'Bucket': 'stream-bucket', 'Key': 'machine-1/chunks/1234.bin'}]
 
 
 def test_google_drive_chunk_storage_adapter_uploads_ciphertext_after_local_write(tmp_path):
