@@ -21,6 +21,10 @@ class _Session:
         self.calls.append({'method': method, 'url': url, 'json': json, 'headers': headers, 'timeout': timeout})
         if url == 'https://api.example/api/v1/stream/listings':
             return _Response({'items': [{'id': 'listing-1'}]})
+        if url == 'https://api.example/api/v1/payment-rails':
+            return _Response({'items': [{'type': 'x402'}, {'type': 'transfer'}]})
+        if url == 'https://api.example/api/v1/delivery-transports':
+            return _Response({'items': [{'mode': 'p2p', 'transportId': 'libp2p'}]})
         if url.endswith('/stream/orders/order-1/prepare-access'):
             return _Response({'item': {'id': 'order-1'}, 'access': [], 'deliverySession': {'id': 'delivery-1'}})
         return _Response({'item': {'id': 'created'}})
@@ -92,3 +96,69 @@ def test_stream_api_client_enrolls_stream_agent_and_reads_machine():
         'label': 'Seller stream',
         'allowedProviderKeys': ['stream'],
     }
+
+
+def test_stream_api_client_uses_purchase_start_paths():
+    session = _Session()
+    client = StreamApiClient('https://api.example')
+    client.session = session
+
+    rails = client.list_payment_rails()
+    transports = client.list_delivery_transports()
+    capability = client.put_delivery_capabilities(
+        'machine-1',
+        'agent-1',
+        [
+            {
+                'transportId': 'libp2p',
+                'version': 'v1',
+                'features': ['chunks'],
+            }
+        ],
+        resource_types=['stream.bundle'],
+        expires_at='2027-01-01T00:00:00Z',
+    )
+    purchase = client.create_purchase(
+        resource={
+            'type': 'stream.listing',
+            'listingId': 'listing-1',
+            'selection': {'chunkIds': ['chunk-1']},
+        },
+        buyer={
+            'id': 'did:peaq:buyer',
+            'publicKey': {'type': 'x25519', 'publicKeyHex': '11' * 32},
+            'deliveryCapabilities': [
+                {
+                    'transportId': 'libp2p',
+                    'version': 'v1',
+                    'features': ['chunks'],
+                }
+            ],
+        },
+        delivery={'acceptableModes': ['p2p'], 'preferredTransports': ['libp2p']},
+    )
+    intent = client.create_purchase_payment_intent(
+        'purchase-1',
+        {
+            'type': 'transfer',
+            'destination': {
+                'chain': 'peaq',
+                'token': 'PEAQ',
+                'payTo': '0x1111111111111111111111111111111111111111',
+            },
+        },
+    )
+
+    assert rails == [{'type': 'x402'}, {'type': 'transfer'}]
+    assert transports == [{'mode': 'p2p', 'transportId': 'libp2p'}]
+    assert capability == {'id': 'created'}
+    assert purchase == {'id': 'created'}
+    assert intent == {'id': 'created'}
+    assert session.calls[0]['url'] == 'https://api.example/api/v1/payment-rails'
+    assert session.calls[1]['url'] == 'https://api.example/api/v1/delivery-transports'
+    assert session.calls[2]['method'] == 'PUT'
+    assert session.calls[2]['url'] == 'https://api.example/api/v1/machines/machine-1/delivery-capabilities'
+    assert session.calls[2]['json']['resourceTypes'] == ['stream.bundle']
+    assert session.calls[3]['url'] == 'https://api.example/api/v1/purchases'
+    assert session.calls[3]['json']['delivery']['preferredTransports'] == ['libp2p']
+    assert session.calls[4]['url'] == 'https://api.example/api/v1/purchases/purchase-1/payment-intent'
