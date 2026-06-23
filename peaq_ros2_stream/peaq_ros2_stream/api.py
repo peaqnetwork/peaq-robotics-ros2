@@ -179,6 +179,30 @@ class StreamApiClient:
         suffix = f'?{urlencode(params)}' if params else ''
         return self._request('GET', f'/api/v1/stream/listings{suffix}')['items']
 
+    def list_payment_rails(self) -> list[dict[str, Any]]:
+        return self._request('GET', '/api/v1/payment-rails')['items']
+
+    def list_delivery_transports(self) -> list[dict[str, Any]]:
+        return self._request('GET', '/api/v1/delivery-transports')['items']
+
+    def put_delivery_capabilities(
+        self,
+        machine_id: str,
+        agent_id: str,
+        capabilities: list[dict[str, Any]],
+        resource_types: list[str] | None = None,
+        expires_at: str = '',
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            'agentId': agent_id,
+            'capabilities': capabilities,
+        }
+        if resource_types:
+            payload['resourceTypes'] = resource_types
+        if expires_at:
+            payload['expiresAt'] = expires_at
+        return self._request('PUT', f'/api/v1/machines/{machine_id}/delivery-capabilities', payload)['item']
+
     def create_order(
         self,
         listing_id: str,
@@ -203,6 +227,34 @@ class StreamApiClient:
             'GET',
             f'/api/v1/stream/orders/{order_id}/delivery?{urlencode({"buyerId": buyer_id})}',
         )
+
+    def create_purchase(
+        self,
+        resource: dict[str, Any],
+        buyer: dict[str, Any],
+        delivery: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            'resource': resource,
+            'buyer': buyer,
+        }
+        if delivery:
+            payload['delivery'] = delivery
+        return self._request('POST', '/api/v1/purchases', payload)['item']
+
+    def get_purchase(self, purchase_id: str) -> dict[str, Any]:
+        return self._request('GET', f'/api/v1/purchases/{purchase_id}')['item']
+
+    def create_purchase_payment_intent(
+        self,
+        purchase_id: str,
+        rail: dict[str, Any],
+        payer: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {'rail': rail}
+        if payer:
+            payload['payer'] = payer
+        return self._request('POST', f'/api/v1/purchases/{purchase_id}/payment-intent', payload)['item']
 
     def list_machine_orders(self, machine_id: str) -> list[dict[str, Any]]:
         return self._request('GET', f'/api/v1/machines/{machine_id}/stream/orders')['items']
