@@ -256,6 +256,27 @@ class StreamApiClient:
             payload['payer'] = payer
         return self._request('POST', f'/api/v1/purchases/{purchase_id}/payment-intent', payload)['item']
 
+    def submit_purchase_payment_proof(self, purchase_id: str, proof: dict[str, Any]) -> dict[str, Any]:
+        return self._request('POST', f'/api/v1/purchases/{purchase_id}/payment-proof', proof)['item']
+
+    def get_purchase_delivery(self, purchase_id: str) -> dict[str, Any]:
+        return self._request('GET', f'/api/v1/purchases/{purchase_id}/delivery')
+
+    def create_purchase_event(
+        self,
+        purchase_id: str,
+        event_type: str,
+        actor: dict[str, Any],
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            'type': event_type,
+            'actor': actor,
+        }
+        if payload:
+            body['payload'] = payload
+        return self._request('POST', f'/api/v1/purchases/{purchase_id}/events', body)['item']
+
     def list_machine_orders(self, machine_id: str) -> list[dict[str, Any]]:
         return self._request('GET', f'/api/v1/machines/{machine_id}/stream/orders')['items']
 
@@ -316,6 +337,7 @@ class StreamApiClient:
         status: str,
         delivery_url: str = '',
         message: str = '',
+        delivery: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             'machineId': machine_id,
@@ -327,4 +349,6 @@ class StreamApiClient:
             payload['deliveryUrl'] = delivery_url
         if message:
             payload['message'] = message
+        if delivery:
+            payload['delivery'] = delivery
         return self._request('PATCH', f'/api/v1/stream/delivery-sessions/{session_id}', payload)['item']
