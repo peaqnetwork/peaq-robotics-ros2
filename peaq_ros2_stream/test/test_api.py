@@ -25,6 +25,8 @@ class _Session:
             return _Response({'items': [{'type': 'x402'}, {'type': 'transfer'}]})
         if url == 'https://api.example/api/v1/delivery-transports':
             return _Response({'items': [{'mode': 'p2p', 'transportId': 'libp2p'}]})
+        if url.endswith('/purchases/purchase-1/delivery'):
+            return _Response({'purchaseId': 'purchase-1', 'delivery': {'transportId': 'libp2p'}, 'access': []})
         if url.endswith('/stream/orders/order-1/prepare-access'):
             return _Response({'item': {'id': 'order-1'}, 'access': [], 'deliverySession': {'id': 'delivery-1'}})
         return _Response({'item': {'id': 'created'}})
@@ -98,7 +100,7 @@ def test_stream_api_client_enrolls_stream_agent_and_reads_machine():
     }
 
 
-def test_stream_api_client_uses_purchase_start_paths():
+def test_stream_api_client_uses_purchase_payment_and_delivery_paths():
     session = _Session()
     client = StreamApiClient('https://api.example')
     client.session = session
@@ -148,12 +150,31 @@ def test_stream_api_client_uses_purchase_start_paths():
             },
         },
     )
+    proof = client.submit_purchase_payment_proof(
+        'purchase-1',
+        {
+            'rail': 'transfer',
+            'chain': 'peaq',
+            'token': 'PEAQ',
+            'transactionHash': '0x' + '12' * 32,
+        },
+    )
+    delivery = client.get_purchase_delivery('purchase-1')
+    event = client.create_purchase_event(
+        'purchase-1',
+        'buyer.connected',
+        {'type': 'buyer', 'id': 'did:peaq:buyer'},
+        {'transportId': 'libp2p'},
+    )
 
     assert rails == [{'type': 'x402'}, {'type': 'transfer'}]
     assert transports == [{'mode': 'p2p', 'transportId': 'libp2p'}]
     assert capability == {'id': 'created'}
     assert purchase == {'id': 'created'}
     assert intent == {'id': 'created'}
+    assert proof == {'id': 'created'}
+    assert delivery['delivery']['transportId'] == 'libp2p'
+    assert event == {'id': 'created'}
     assert session.calls[0]['url'] == 'https://api.example/api/v1/payment-rails'
     assert session.calls[1]['url'] == 'https://api.example/api/v1/delivery-transports'
     assert session.calls[2]['method'] == 'PUT'
@@ -162,3 +183,7 @@ def test_stream_api_client_uses_purchase_start_paths():
     assert session.calls[3]['url'] == 'https://api.example/api/v1/purchases'
     assert session.calls[3]['json']['delivery']['preferredTransports'] == ['libp2p']
     assert session.calls[4]['url'] == 'https://api.example/api/v1/purchases/purchase-1/payment-intent'
+    assert session.calls[5]['url'] == 'https://api.example/api/v1/purchases/purchase-1/payment-proof'
+    assert session.calls[6]['method'] == 'GET'
+    assert session.calls[6]['url'] == 'https://api.example/api/v1/purchases/purchase-1/delivery'
+    assert session.calls[7]['url'] == 'https://api.example/api/v1/purchases/purchase-1/events'
