@@ -20,6 +20,7 @@ from peaq_ros2_stream.libp2p_delivery import (
     Libp2pDeliveryTransport,
     Libp2pPeer,
     PyLibp2pStreamRuntime,
+    libp2p_peer_from_connection,
     new_libp2p_host,
     register_libp2p_chunk_handler,
 )
@@ -111,12 +112,26 @@ def test_libp2p_delivery_transport_uses_chunk_protocol_and_runtime_boundary():
     assert delivered == [_chunk('chunk-1')]
     assert runtime.calls[0]['peer_id'] == '12D3KooWSeller'
     assert runtime.calls[0]['protocol_id'] == CHUNK_PROTOCOL_ID
-    assert runtime.calls[0]['params']['multiaddrs'] == [
+    assert runtime.calls[0]['params']['connection']['addresses'] == [
         '/ip4/127.0.0.1/tcp/4001',
     ]
-    assert transport.capability({'peerId': '12D3KooWSeller'})['protocols'] == [
-        CHUNK_PROTOCOL_ID,
-    ]
+    capability = transport.capability({'nodeId': '12D3KooWSeller'})
+    assert capability['transportId'] == 'peaqos-p2p'
+    assert capability['connection'] == {'type': 'p2p', 'nodeId': '12D3KooWSeller'}
+    assert capability['protocols'] == [CHUNK_PROTOCOL_ID]
+
+
+def test_public_connection_maps_to_libp2p_peer_boundary():
+    peer = libp2p_peer_from_connection(
+        {
+            'type': 'p2p',
+            'nodeId': '12D3KooWSeller',
+            'addresses': ['/ip4/127.0.0.1/tcp/4001'],
+        }
+    )
+
+    assert peer.peer_id == '12D3KooWSeller'
+    assert peer.multiaddrs == ['/ip4/127.0.0.1/tcp/4001']
 
 
 def test_py_libp2p_runtime_moves_chunks_between_two_hosts():

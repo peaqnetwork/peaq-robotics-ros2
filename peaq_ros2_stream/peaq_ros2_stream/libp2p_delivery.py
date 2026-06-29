@@ -22,7 +22,12 @@ from .delivery_protocol import (
     parse_chunk_request,
     response_frames_for_request,
 )
-from .delivery_transport import DeliveryChunk, transport_capability
+from .delivery_transport import (
+    PEAQOS_P2P_TRANSPORT_ID,
+    DeliveryChunk,
+    delivery_connection,
+    transport_capability,
+)
 
 
 class Libp2pRequestRuntime(Protocol):
@@ -46,6 +51,15 @@ class Libp2pPeer:
     multiaddrs: list[str]
 
 
+def libp2p_peer_from_connection(connection: dict[str, Any]) -> Libp2pPeer:
+    public_connection = delivery_connection(connection) or {}
+    peer_id = str(public_connection.get('nodeId') or '').strip()
+    addresses = public_connection.get('addresses')
+    if not isinstance(addresses, list):
+        addresses = []
+    return Libp2pPeer(peer_id=peer_id, multiaddrs=[str(addr) for addr in addresses])
+
+
 class Libp2pDeliveryTransport:
     def __init__(
         self,
@@ -53,7 +67,7 @@ class Libp2pDeliveryTransport:
         version: str = 'v1',
         features: tuple[str, ...] = ('chunks', 'resume'),
     ) -> None:
-        self.transport_id = 'libp2p'
+        self.transport_id = PEAQOS_P2P_TRANSPORT_ID
         self.version = version
         self.features = features
         self.runtime = runtime
@@ -63,7 +77,7 @@ class Libp2pDeliveryTransport:
             self.transport_id,
             self.version,
             self.features,
-            params,
+            connection=delivery_connection(params),
         )
         capability['protocols'] = [CHUNK_PROTOCOL_ID]
         capability['encoding'] = CHUNK_PROTOCOL_ENCODING
@@ -81,7 +95,9 @@ class Libp2pDeliveryTransport:
             CHUNK_PROTOCOL_ID,
             payload,
             {
-                'multiaddrs': peer.multiaddrs,
+                'connection': delivery_connection(
+                    {'nodeId': peer.peer_id, 'addresses': peer.multiaddrs}
+                ),
                 **(params or {}),
             },
         )
@@ -202,11 +218,12 @@ def _peer_info_from_params(
     params: dict[str, Any],
     libp2p_types: dict[str, Any],
 ) -> Any:
-    multiaddrs = params.get('multiaddrs')
+    connection = delivery_connection(params.get('connection') if isinstance(params.get('connection'), dict) else params) or {}
+    multiaddrs = connection.get('addresses') or params.get('multiaddrs')
     if not isinstance(multiaddrs, list) or not multiaddrs:
-        raise ValueError('libp2p peer multiaddrs are required')
+        raise ValueError('p2p peer addresses are required')
 
-    resolved_peer_id = str(peer_id or '')
+    resolved_peer_id = str(peer_id or connection.get('nodeId') or '')
     transport_addrs = []
     multiaddr_cls = libp2p_types['Multiaddr']
     peer_info_cls = libp2p_types['PeerInfo']
@@ -222,12 +239,12 @@ def _peer_info_from_params(
             continue
         parsed_peer_id = str(parsed_info.peer_id)
         if resolved_peer_id and parsed_peer_id != resolved_peer_id:
-            raise ValueError('libp2p peer id does not match the provided multiaddr')
+            raise ValueError('p2p peer id does not match the provided address')
         resolved_peer_id = parsed_peer_id
         transport_addrs.extend(parsed_info.addrs)
 
     if not resolved_peer_id:
-        raise ValueError('libp2p peer id is required')
+        raise ValueError('p2p peer id is required')
     return peer_info_cls(peer_id_cls.from_string(resolved_peer_id), transport_addrs)
 
 

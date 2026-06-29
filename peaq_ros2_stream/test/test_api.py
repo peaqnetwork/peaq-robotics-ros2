@@ -24,9 +24,9 @@ class _Session:
         if url == 'https://api.example/api/v1/payment-rails':
             return _Response({'items': [{'type': 'x402'}, {'type': 'transfer'}]})
         if url == 'https://api.example/api/v1/delivery-transports':
-            return _Response({'items': [{'mode': 'p2p', 'transportId': 'libp2p'}]})
+            return _Response({'items': [{'mode': 'p2p', 'transportId': 'peaqos-p2p'}]})
         if url.endswith('/purchases/purchase-1/delivery'):
-            return _Response({'purchaseId': 'purchase-1', 'delivery': {'transportId': 'libp2p'}, 'access': []})
+            return _Response({'purchaseId': 'purchase-1', 'delivery': {'transportId': 'peaqos-p2p'}, 'access': []})
         if url.endswith('/stream/orders/order-1/prepare-access'):
             return _Response({'item': {'id': 'order-1'}, 'access': [], 'deliverySession': {'id': 'delivery-1'}})
         return _Response({'item': {'id': 'created'}})
@@ -112,7 +112,7 @@ def test_stream_api_client_uses_purchase_payment_and_delivery_paths():
         'agent-1',
         [
             {
-                'transportId': 'libp2p',
+                'transportId': 'peaqos-p2p',
                 'version': 'v1',
                 'features': ['chunks'],
             }
@@ -131,13 +131,13 @@ def test_stream_api_client_uses_purchase_payment_and_delivery_paths():
             'publicKey': {'type': 'x25519', 'publicKeyHex': '11' * 32},
             'deliveryCapabilities': [
                 {
-                    'transportId': 'libp2p',
+                    'transportId': 'peaqos-p2p',
                     'version': 'v1',
                     'features': ['chunks'],
                 }
             ],
         },
-        delivery={'acceptableModes': ['p2p'], 'preferredTransports': ['libp2p']},
+        delivery={'acceptableModes': ['p2p'], 'preferredTransports': ['peaqos-p2p']},
     )
     intent = client.create_purchase_payment_intent(
         'purchase-1',
@@ -164,16 +164,16 @@ def test_stream_api_client_uses_purchase_payment_and_delivery_paths():
         'purchase-1',
         'buyer.connected',
         {'type': 'buyer', 'id': 'did:peaq:buyer'},
-        {'transportId': 'libp2p'},
+        {'transportId': 'peaqos-p2p'},
     )
 
     assert rails == [{'type': 'x402'}, {'type': 'transfer'}]
-    assert transports == [{'mode': 'p2p', 'transportId': 'libp2p'}]
+    assert transports == [{'mode': 'p2p', 'transportId': 'peaqos-p2p'}]
     assert capability == {'id': 'created'}
     assert purchase == {'id': 'created'}
     assert intent == {'id': 'created'}
     assert proof == {'id': 'created'}
-    assert delivery['delivery']['transportId'] == 'libp2p'
+    assert delivery['delivery']['transportId'] == 'peaqos-p2p'
     assert event == {'id': 'created'}
     assert session.calls[0]['url'] == 'https://api.example/api/v1/payment-rails'
     assert session.calls[1]['url'] == 'https://api.example/api/v1/delivery-transports'
@@ -181,7 +181,7 @@ def test_stream_api_client_uses_purchase_payment_and_delivery_paths():
     assert session.calls[2]['url'] == 'https://api.example/api/v1/machines/machine-1/delivery-capabilities'
     assert session.calls[2]['json']['resourceTypes'] == ['stream.bundle']
     assert session.calls[3]['url'] == 'https://api.example/api/v1/purchases'
-    assert session.calls[3]['json']['delivery']['preferredTransports'] == ['libp2p']
+    assert session.calls[3]['json']['delivery']['preferredTransports'] == ['peaqos-p2p']
     assert session.calls[4]['url'] == 'https://api.example/api/v1/purchases/purchase-1/payment-intent'
     assert session.calls[5]['url'] == 'https://api.example/api/v1/purchases/purchase-1/payment-proof'
     assert session.calls[6]['method'] == 'GET'
