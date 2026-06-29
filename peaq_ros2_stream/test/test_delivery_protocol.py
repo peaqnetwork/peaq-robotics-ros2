@@ -20,7 +20,9 @@ from peaq_ros2_stream.libp2p_delivery import (
     Libp2pDeliveryTransport,
     Libp2pPeer,
     PyLibp2pStreamRuntime,
+    libp2p_connect_url,
     libp2p_peer_from_connection,
+    libp2p_peer_from_connect,
     new_libp2p_host,
     register_libp2p_chunk_handler,
 )
@@ -110,18 +112,47 @@ def test_libp2p_delivery_transport_uses_chunk_protocol_and_runtime_boundary():
     )
 
     assert delivered == [_chunk('chunk-1')]
+    connect = transport.connect_handoff(
+        Libp2pPeer(
+            peer_id='12D3KooWSeller',
+            multiaddrs=['/ip4/127.0.0.1/tcp/4001'],
+        ),
+        session_id='delivery-1',
+        expires_at='2027-01-01T00:00:00.000Z',
+    )
+    delivered_from_connect = asyncio.run(transport.fetch_chunks_from_connect(connect, request))
+
+    assert delivered_from_connect == [_chunk('chunk-1')]
     assert runtime.calls[0]['peer_id'] == '12D3KooWSeller'
     assert runtime.calls[0]['protocol_id'] == CHUNK_PROTOCOL_ID
     assert runtime.calls[0]['params']['connection']['addresses'] == [
         '/ip4/127.0.0.1/tcp/4001',
     ]
+    assert runtime.calls[1]['peer_id'] == '12D3KooWSeller'
     capability = transport.capability({'nodeId': '12D3KooWSeller'})
     assert capability['transportId'] == 'peaqos-p2p'
-    assert capability['connection'] == {'type': 'p2p', 'nodeId': '12D3KooWSeller'}
+    assert 'connection' not in capability
     assert capability['protocols'] == [CHUNK_PROTOCOL_ID]
 
 
-def test_public_connection_maps_to_libp2p_peer_boundary():
+def test_connect_handoff_maps_to_libp2p_peer_boundary():
+    expires_at = '2027-01-01T00:00:00.000Z'
+    peer = Libp2pPeer(
+        peer_id='12D3KooWSeller',
+        multiaddrs=['/ip4/127.0.0.1/tcp/4001'],
+    )
+    connect = {
+        'type': 'peaqos-p2p-url',
+        'url': libp2p_connect_url(peer, session_id='delivery-1', expires_at=expires_at),
+        'expiresAt': expires_at,
+    }
+
+    parsed = libp2p_peer_from_connect(connect)
+
+    assert parsed == peer
+
+
+def test_internal_connection_maps_to_libp2p_peer_boundary():
     peer = libp2p_peer_from_connection(
         {
             'type': 'p2p',

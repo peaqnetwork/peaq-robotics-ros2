@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Protocol
+from urllib.parse import urlparse
 
 
 PEAQOS_P2P_TRANSPORT_ID = 'peaqos-p2p'
+PEAQOS_P2P_CONNECT_TYPE = 'peaqos-p2p-url'
 
 
 def normalize_transport_id(transport_id: str) -> str:
@@ -46,6 +48,29 @@ def delivery_connection(params: dict[str, Any] | None = None) -> dict[str, Any] 
     if hints or extra_hints:
         connection['hints'] = {**hints, **extra_hints}
     return connection
+
+
+def delivery_connect(params: dict[str, Any] | None = None) -> dict[str, str] | None:
+    if not params:
+        return None
+    source = params.get('connect') if isinstance(params.get('connect'), dict) else params
+    url = str(source.get('url') or '').strip()
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if not parsed.scheme:
+        raise ValueError('delivery connect url must be absolute')
+    connect_type = str(source.get('type') or PEAQOS_P2P_CONNECT_TYPE).strip()
+    if connect_type != PEAQOS_P2P_CONNECT_TYPE:
+        raise ValueError(f'delivery connect type must be {PEAQOS_P2P_CONNECT_TYPE}')
+    expires_at = str(source.get('expiresAt') or '').strip()
+    if not expires_at:
+        raise ValueError('delivery connect expiresAt is required')
+    return {
+        'type': connect_type,
+        'url': url,
+        'expiresAt': expires_at,
+    }
 
 
 @dataclass(frozen=True)
@@ -89,15 +114,11 @@ def transport_capability(
     params: dict[str, Any] | None = None,
     connection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    capability: dict[str, Any] = {
+    return {
         'transportId': normalize_transport_id(transport_id),
         'version': version,
         'features': list(features),
     }
-    public_connection = connection or delivery_connection(params)
-    if public_connection:
-        capability['connection'] = public_connection
-    return capability
 
 
 class LocalMemoryDeliveryTransport:

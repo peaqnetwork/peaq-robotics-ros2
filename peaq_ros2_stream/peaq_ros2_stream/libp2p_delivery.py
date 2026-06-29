@@ -6,6 +6,7 @@ import struct
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
 from .delivery_protocol import (
     CHUNK_PROTOCOL_ENCODING,
@@ -24,8 +25,10 @@ from .delivery_protocol import (
 )
 from .delivery_transport import (
     PEAQOS_P2P_TRANSPORT_ID,
+    PEAQOS_P2P_CONNECT_TYPE,
     DeliveryChunk,
     delivery_connection,
+    delivery_connect,
     transport_capability,
 )
 
@@ -52,11 +55,44 @@ class Libp2pPeer:
 
 
 def libp2p_peer_from_connection(connection: dict[str, Any]) -> Libp2pPeer:
-    public_connection = delivery_connection(connection) or {}
-    peer_id = str(public_connection.get('nodeId') or '').strip()
-    addresses = public_connection.get('addresses')
+    normalized = delivery_connection(connection) or {}
+    peer_id = str(normalized.get('nodeId') or '').strip()
+    addresses = normalized.get('addresses')
     if not isinstance(addresses, list):
         addresses = []
+    return Libp2pPeer(peer_id=peer_id, multiaddrs=[str(addr) for addr in addresses])
+
+
+def libp2p_connect_url(
+    peer: Libp2pPeer,
+    *,
+    session_id: str = '',
+    expires_at: str = '',
+) -> str:
+    query: dict[str, list[str] | str] = {
+        'addr': peer.multiaddrs,
+    }
+    if session_id:
+        query['session'] = session_id
+    if expires_at:
+        query['expiresAt'] = expires_at
+    return f'peaqos-p2p://{quote(peer.peer_id, safe="")}?{urlencode(query, doseq=True)}'
+
+
+def libp2p_peer_from_connect(connect: dict[str, Any]) -> Libp2pPeer:
+    handoff = delivery_connect(connect)
+    if handoff is None:
+        raise ValueError('p2p connect handoff is required')
+    parsed = urlparse(handoff['url'])
+    if parsed.scheme != 'peaqos-p2p':
+        raise ValueError('p2p connect url must use peaqos-p2p scheme')
+    peer_id = unquote(parsed.netloc or parsed.path.strip('/'))
+    query = parse_qs(parsed.query)
+    addresses = query.get('addr') or query.get('address') or []
+    if not peer_id:
+        raise ValueError('p2p connect url must include a peer id')
+    if not addresses:
+        raise ValueError('p2p connect url must include at least one addr query value')
     return Libp2pPeer(peer_id=peer_id, multiaddrs=[str(addr) for addr in addresses])
 
 
@@ -77,11 +113,31 @@ class Libp2pDeliveryTransport:
             self.transport_id,
             self.version,
             self.features,
-            connection=delivery_connection(params),
         )
         capability['protocols'] = [CHUNK_PROTOCOL_ID]
         capability['encoding'] = CHUNK_PROTOCOL_ENCODING
         return capability
+
+    def connect_handoff(
+        self,
+        peer: Libp2pPeer,
+        *,
+        expires_at: str,
+        session_id: str = '',
+    ) -> dict[str, str]:
+        return {
+            'type': PEAQOS_P2P_CONNECT_TYPE,
+            'url': libp2p_connect_url(peer, session_id=session_id, expires_at=expires_at),
+            'expiresAt': expires_at,
+        }
+
+    async def fetch_chunks_from_connect(
+        self,
+        connect: dict[str, Any],
+        request: ChunkRequest,
+        params: dict[str, Any] | None = None,
+    ) -> list[DeliveryChunk]:
+        return await self.fetch_chunks(libp2p_peer_from_connect(connect), request, params=params)
 
     async def fetch_chunks(
         self,

@@ -7,6 +7,7 @@ from peaq_ros2_stream.delivery_transport import (
     LocalMemoryDeliveryTransport,
     PEAQOS_P2P_TRANSPORT_ID,
     StreamDeliveryTransportRegistry,
+    delivery_connect,
     transport_capability,
 )
 
@@ -31,7 +32,6 @@ def test_local_memory_transport_moves_encrypted_chunks_and_records_ack():
         'transportId': PEAQOS_P2P_TRANSPORT_ID,
         'version': 'v1',
         'features': ['chunks', 'resume'],
-        'connection': {'type': 'p2p', 'nodeId': 'seller-peer'},
     }
     assert delivered == chunk
     assert ack.transport_id == PEAQOS_P2P_TRANSPORT_ID
@@ -69,3 +69,19 @@ def test_transport_registry_fails_when_no_common_registered_transport():
             seller_capabilities=[transport_capability(PEAQOS_P2P_TRANSPORT_ID, 'v1', ['chunks'])],
             buyer_capabilities=[transport_capability(PEAQOS_P2P_TRANSPORT_ID, 'v1', ['chunks'])],
         )
+
+
+def test_delivery_connect_requires_short_lived_url_shape():
+    connect = delivery_connect(
+        {
+            'type': 'peaqos-p2p-url',
+            'url': 'peaqos-p2p://seller-peer?addr=%2Fip4%2F127.0.0.1%2Ftcp%2F4001',
+            'expiresAt': '2027-01-01T00:00:00.000Z',
+        }
+    )
+
+    assert connect == {
+        'type': 'peaqos-p2p-url',
+        'url': 'peaqos-p2p://seller-peer?addr=%2Fip4%2F127.0.0.1%2Ftcp%2F4001',
+        'expiresAt': '2027-01-01T00:00:00.000Z',
+    }

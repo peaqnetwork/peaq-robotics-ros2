@@ -26,7 +26,20 @@ class _Session:
         if url == 'https://api.example/api/v1/delivery-transports':
             return _Response({'items': [{'mode': 'p2p', 'transportId': 'peaqos-p2p'}]})
         if url.endswith('/purchases/purchase-1/delivery'):
-            return _Response({'purchaseId': 'purchase-1', 'delivery': {'transportId': 'peaqos-p2p'}, 'access': []})
+            return _Response(
+                {
+                    'purchaseId': 'purchase-1',
+                    'delivery': {
+                        'transportId': 'peaqos-p2p',
+                        'connect': {
+                            'type': 'peaqos-p2p-url',
+                            'url': 'peaqos-p2p://seller-peer?addr=%2Fip4%2F127.0.0.1%2Ftcp%2F4001',
+                            'expiresAt': '2027-01-01T00:00:00.000Z',
+                        },
+                    },
+                    'access': [],
+                }
+            )
         if url.endswith('/stream/orders/order-1/prepare-access'):
             return _Response({'item': {'id': 'order-1'}, 'access': [], 'deliverySession': {'id': 'delivery-1'}})
         return _Response({'item': {'id': 'created'}})
@@ -174,6 +187,7 @@ def test_stream_api_client_uses_purchase_payment_and_delivery_paths():
     assert intent == {'id': 'created'}
     assert proof == {'id': 'created'}
     assert delivery['delivery']['transportId'] == 'peaqos-p2p'
+    assert delivery['delivery']['connect']['type'] == 'peaqos-p2p-url'
     assert event == {'id': 'created'}
     assert session.calls[0]['url'] == 'https://api.example/api/v1/payment-rails'
     assert session.calls[1]['url'] == 'https://api.example/api/v1/delivery-transports'
