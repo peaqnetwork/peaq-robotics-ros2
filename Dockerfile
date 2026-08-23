@@ -34,8 +34,11 @@ RUN ipfs init
 # Copy requirements file
 COPY requirements.txt /tmp/requirements.txt
 
-# Install Python dependencies
-RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
+# Upgrade the base image's pip before resolving the SDK dependency graph. The
+# Ubuntu 22.04 package ships pip 22.0, whose resolver backtracks extensively on
+# the current peaq SDK and Web3 dependency ranges.
+RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Source ROS2 setup in bashrc
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
